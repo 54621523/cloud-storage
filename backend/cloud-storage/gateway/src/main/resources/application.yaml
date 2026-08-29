@@ -1,0 +1,91 @@
+server:
+  port: 17000
+
+spring:
+  application:
+    name: gateway
+
+
+  cloud:
+    nacos:
+      discovery:
+        server-addr: localhost:8848
+        namespace: public
+        group: DEFAULT_GROUP
+      config:
+        import-check:
+          enabled: false
+        server-addr: localhost:8848
+        namespace: public
+        group: DEFAULT_GROUP
+        file-extension: yaml
+
+
+    gateway:
+      server:
+        webflux:
+          discovery:
+            locator:
+              enabled: true
+          routes:
+            - id: file-service-route
+              uri: lb://file-service
+              predicates:
+                - Path=/api/files/**, /api/storage/**, /api/v2/storage/**, /api/storage, /api/recycle/**
+
+            - id: share-service-route
+              uri: lb://share-service
+              predicates:
+                - Path=/api/shares/**
+
+            - id: auth-service-route
+              uri: lb://auth-service
+              predicates:
+                - Path=/api/auth/**
+
+            - id: ai-service-route
+              uri: lb://outer-service
+              predicates:
+                - Path=/api/ai/**
+
+# JWT配置
+jwt:
+  secret: "rUumnD1Kx5pClceikvJbmo9QoAeGXuWyuh5YNuV4lCU="
+  expiration: 86400000
+
+
+# Actuator配置
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health, info, metrics, prometheus, gateway
+
+
+knife4j:
+  gateway:
+    enabled: true
+    strategy: discover
+    discover:
+      excluded-services:
+        - gateway
+      version: openapi3
+    routes:
+      - name: 文件体系
+        service-name: file-service
+        url: /file-service/v3/api-docs
+
+      - name: 分享体系
+        service-name: share-service
+        url: /share-service/v3/api-docs
+
+
+
+#logging:
+#  level:
+#    org.springframework.web: DEBUG
+#    org.springframework.cloud.gateway: DEBUG
+#    org.springframework.web.reactive.function.server: DEBUG
+#    reactor.netty: DEBUG
+#    com.github.xiaoymin.knife4j: DEBUG
+#    org.springframework.web.reactive.function.client: DEBUG

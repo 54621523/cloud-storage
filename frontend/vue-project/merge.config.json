@@ -1,0 +1,17 @@
+{
+  "inputs": [
+    {
+      "inputURL": "http://localhost:17000/file-service/v3/api-docs"
+    },
+    {
+      "inputURL": "http://localhost:17000/share-service/v3/api-docs"
+    },
+    {
+      "inputURL": "http://localhost:17000/outer-service/v3/api-docs"
+    },
+    {
+      "inputURL": "http://localhost:17000/auth-service/v3/api-docs"
+    }
+  ],
+  "output": "./merged-api-docs.json"
+}

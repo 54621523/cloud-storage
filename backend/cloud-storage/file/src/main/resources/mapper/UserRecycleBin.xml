@@ -1,0 +1,42 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+        "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="demo.cloud.file.mapper.UserRecycleBinMapper">
+
+    <!-- 定义结果映射，将查询结果转为 RecycleFileVO -->
+    <resultMap id="recycleFileVOMap" type="demo.cloud.file.dto.RecycleFileVO">
+        <id property="id" column="id"/>
+        <result property="name" column="name"/>
+        <result property="size" column="size"/>
+        <result property="deletedAt" column="deleted_at"/>
+        <!-- 使用 MyBatis 内置的 EnumTypeHandler 将字符串转为枚举 -->
+        <result property="type" column="type" typeHandler="org.apache.ibatis.type.EnumTypeHandler"/>
+    </resultMap>
+
+    <!-- 分页查询回收站（联合查询两张表） -->
+    <select id="selectRecycleBin" resultMap="recycleFileVOMap">
+        SELECT
+            id,
+            name,
+            size,                       -- user_file 有 size
+            deleted_at,
+            'FILE' AS type              -- 标识为文件
+        FROM user_file
+        WHERE user_id = #{userId}
+          AND deleted_at IS NOT NULL    -- 已删除的条目
+
+        UNION ALL
+
+        SELECT
+            id,
+            name,
+            NULL AS size,               -- user_folder 没有 size，用 NULL 表示
+            deleted_at,
+            'FOLDER' AS type            -- 标识为文件夹
+        FROM user_folder
+        WHERE user_id = #{userId}
+          AND deleted_at IS NOT NULL
+
+        ORDER BY deleted_at DESC        -- 按删除时间倒序（最新的在前）
+    </select>
+</mapper>

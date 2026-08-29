@@ -1,0 +1,26 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+        "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="demo.cloud.share.mapper.ShareLinkMapper">
+    <select id="selectDTOList" resultType="demo.cloud.share.dto.ShareLinkVO">
+        SELECT *
+        FROM share_link sl
+        WHERE sl.user_id = #{userId}
+            ${ew.customSqlSegment}
+
+    </select>
+    <select id="selectShareLinkVO" resultType="demo.cloud.share.dto.ShareLinkVO">
+        SELECT
+            s.id,
+            s.display_name,
+            s.share_code AS shareCode,
+            s.password,
+            s.expire_time AS expireTime,
+            s.create_time AS createTime,
+            s.update_time AS updateTime
+        FROM share_link s
+        WHERE s.user_id = #{userId}
+        GROUP BY s.id, s.create_time
+        ORDER BY s.create_time DESC
+    </select>
+</mapper>

@@ -1,0 +1,2488 @@
+{
+  "openapi": "3.0.3",
+  "info": {
+    "title": "OpenAPI definition",
+    "version": "v0"
+  },
+  "servers": [
+    {
+      "url": "http://10.239.105.110:11082",
+      "description": "Generated server url"
+    }
+  ],
+  "tags": [
+    {
+      "name": "文件管理",
+      "description": "包含文件/文件夹的浏览、创建、删除等操作"
+    },
+    {
+      "name": "回收站管理",
+      "description": "包含回收站内的浏览、还原、彻底删除等操作"
+    },
+    {
+      "name": "文件传输（通用服务）",
+      "description": "提供分片上传、下载链接获取等通用存储能力"
+    },
+    {
+      "name": "分享模块",
+      "description": "创建、删除、更新、访问分享的接口"
+    },
+    {
+      "name": "AI应用",
+      "description": "与AI交互的接口"
+    },
+    {
+      "name": "认证模块",
+      "description": "登录、注册的接口"
+    }
+  ],
+  "paths": {
+    "/api/v2/storage/merge": {
+      "post": {
+        "tags": [
+          "upload-v-2-service"
+        ],
+        "operationId": "completeMultipartUpload",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/MergeRequestV2"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v2/storage/init": {
+      "post": {
+        "tags": [
+          "upload-v-2-service"
+        ],
+        "operationId": "initUpload",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/InitRequestV2"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/InitResponseV2"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/storage/upload/merge": {
+      "post": {
+        "tags": [
+          "文件传输（通用服务）"
+        ],
+        "summary": "合并分片",
+        "operationId": "mergeChunks",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/MergeRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Result"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/storage/upload/init": {
+      "post": {
+        "tags": [
+          "文件传输（通用服务）"
+        ],
+        "summary": "初始化上传会话",
+        "operationId": "initUpload_1",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/InitRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ResultUploadSession"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/storage/upload/chunk": {
+      "post": {
+        "tags": [
+          "文件传输（通用服务）"
+        ],
+        "summary": "上传分片",
+        "operationId": "uploadChunk",
+        "requestBody": {
+          "content": {
+            "multipart/form-data": {
+              "schema": {
+                "required": [
+                  "chunk",
+                  "request"
+                ],
+                "type": "object",
+                "properties": {
+                  "request": {
+                    "$ref": "#/components/schemas/UploadChunkRequest"
+                  },
+                  "chunk": {
+                    "type": "string",
+                    "description": "分片文件",
+                    "format": "binary"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ResultUploadProgress"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/storage/upload/cancel": {
+      "post": {
+        "tags": [
+          "文件传输（通用服务）"
+        ],
+        "summary": "取消上传",
+        "operationId": "cancelUpload",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CancelRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ResultVoid"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/recycle/restore": {
+      "post": {
+        "tags": [
+          "回收站管理"
+        ],
+        "summary": "还原文件/文件夹",
+        "description": "还原文件或文件夹",
+        "operationId": "restore",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/RestoreRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Result"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/files/rename": {
+      "post": {
+        "tags": [
+          "文件管理"
+        ],
+        "summary": "重命名文件/文件夹",
+        "description": "重命名一个文件或文件夹",
+        "operationId": "rename",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/RenameRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Result"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/files/move-to": {
+      "post": {
+        "tags": [
+          "文件管理"
+        ],
+        "summary": "移动文件/文件夹",
+        "description": "将文件/文件夹移动到指定父目录下",
+        "operationId": "moveTo",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/MoveRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Result"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/files/folders": {
+      "post": {
+        "tags": [
+          "文件管理"
+        ],
+        "summary": "新建文件夹",
+        "description": "在指定的父目录下创建一个新文件夹",
+        "operationId": "createFolder",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreateFolderRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Result"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v2/storage/listParts": {
+      "get": {
+        "tags": [
+          "upload-v-2-service"
+        ],
+        "operationId": "listParts",
+        "parameters": [
+          {
+            "name": "bucket",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "key",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "uploadId",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/PartInfo"
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v2/storage/Download": {
+      "get": {
+        "tags": [
+          "upload-v-2-service"
+        ],
+        "operationId": "generateDownloadUrl",
+        "parameters": [
+          {
+            "name": "virtualFileId",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "format": "int64"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/storage/upload/progress/{sessionId}": {
+      "get": {
+        "tags": [
+          "文件传输（通用服务）"
+        ],
+        "summary": "查询上传进度",
+        "operationId": "getProgress",
+        "parameters": [
+          {
+            "name": "sessionId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ResultUploadProgress"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/storage/download-url/by-key": {
+      "get": {
+        "tags": [
+          "文件传输（通用服务）"
+        ],
+        "summary": "根据存储Key获取下载链接（通用）",
+        "operationId": "getDownloadUrlByKey",
+        "parameters": [
+          {
+            "name": "ossKey",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "expireHours",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "format": "int32",
+              "default": 1
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ResultString"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/recycle": {
+      "get": {
+        "tags": [
+          "回收站管理"
+        ],
+        "summary": "获取回收站文件列表",
+        "description": "查询回收站内所有文件和文件夹",
+        "operationId": "listRecycleBinFiles",
+        "parameters": [
+          {
+            "name": "pageNum",
+            "in": "query",
+            "description": "页码",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "format": "int64"
+            },
+            "example": 1001
+          },
+          {
+            "name": "pageSize",
+            "in": "query",
+            "description": "页大小",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "format": "int64"
+            },
+            "example": 50
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ResultPageResultRecycleFileVO"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/files/list-folderOnly": {
+      "get": {
+        "tags": [
+          "文件管理"
+        ],
+        "summary": "仅获取文件夹列表",
+        "description": "根据父目录ID查询该目录下的子文件夹",
+        "operationId": "listFolderOnly",
+        "parameters": [
+          {
+            "name": "parentId",
+            "in": "query",
+            "description": "父目录ID，若为0或null则自动定位到用户根目录",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "format": "int64"
+            },
+            "example": 1001
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ResultListVirtualFileVO"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/files/list-file": {
+      "get": {
+        "tags": [
+          "文件管理"
+        ],
+        "summary": "获取文件列表",
+        "description": "根据父目录ID查询该目录下的所有文件和子文件夹",
+        "operationId": "listFiles",
+        "parameters": [
+          {
+            "name": "parentId",
+            "in": "query",
+            "description": "父目录ID，若为0或null则自动定位到用户根目录",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "format": "int64"
+            },
+            "example": 1001
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ResultListVirtualFileVO"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/recycle/permanent": {
+      "delete": {
+        "tags": [
+          "回收站管理"
+        ],
+        "summary": "批量彻底删除",
+        "description": "彻底删除文件/文件夹",
+        "operationId": "deletePermanently",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/DeleteRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Result"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/files": {
+      "delete": {
+        "tags": [
+          "文件管理"
+        ],
+        "summary": "批量移入回收站",
+        "description": "逻辑删除，将文件/文件夹移入回收站",
+        "operationId": "moveToRecycleBin",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/DeleteRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Result"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/shares/update": {
+      "put": {
+        "tags": [
+          "分享模块"
+        ],
+        "operationId": "updateSharedFile",
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "*/*": {
+                "schema": {
+                  "$ref": "#/components/schemas/Result"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/shares/verify/{shareCode}": {
+      "post": {
+        "tags": [
+          "分享模块"
+        ],
+        "summary": "访问分享链接",
+        "description": "使用提取码访问分享链接",
+        "operationId": "verifySharedFile",
+        "parameters": [
+          {
+            "name": "shareCode",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "password",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "*/*": {
+                "schema": {
+                  "$ref": "#/components/schemas/ResultString"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/shares/share": {
+      "post": {
+        "tags": [
+          "分享模块"
+        ],
+        "summary": "创建分享链接",
+        "description": "根据请求体创建分享链接",
+        "operationId": "shareFile",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreateShareRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "*/*": {
+                "schema": {
+                  "$ref": "#/components/schemas/ResultCreateShareResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/shares/save": {
+      "post": {
+        "tags": [
+          "分享模块"
+        ],
+        "summary": "转存文件",
+        "description": "访问者将文件转存到自己的网盘中，需要指定目标文件夹",
+        "operationId": "saveSharedFile",
+        "parameters": [
+          {
+            "name": "Share-Token",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/TransferRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "*/*": {
+                "schema": {
+                  "$ref": "#/components/schemas/Result"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/shares/list": {
+      "get": {
+        "tags": [
+          "分享模块"
+        ],
+        "summary": "查询分享文件列表",
+        "description": "查询属于自己的分享链接列表",
+        "operationId": "listSharedFile",
+        "parameters": [
+          {
+            "name": "pageNum",
+            "in": "query",
+            "description": "页码",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "format": "int64"
+            },
+            "example": 1001
+          },
+          {
+            "name": "pageSize",
+            "in": "query",
+            "description": "页大小",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "format": "int64"
+            },
+            "example": 50
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "*/*": {
+                "schema": {
+                  "$ref": "#/components/schemas/ResultPageResultShareLinkVO"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/shares/info": {
+      "get": {
+        "tags": [
+          "分享模块"
+        ],
+        "summary": "访问他人分享详情",
+        "description": "访问他人分享链接具体内容",
+        "operationId": "getShareInfo",
+        "parameters": [
+          {
+            "name": "Share-Token",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "parentId",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "format": "int64"
+            }
+          },
+          {
+            "name": "rootId",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "format": "int64"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "*/*": {
+                "schema": {
+                  "$ref": "#/components/schemas/ResultListVirtualFileVO"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/shares/download": {
+      "get": {
+        "tags": [
+          "分享模块"
+        ],
+        "summary": "下载文件",
+        "description": "访问者直接在网页中下载文件，返回一个下载链接",
+        "operationId": "downloadSharedFile",
+        "parameters": [
+          {
+            "name": "Share-Token",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "id",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "format": "int64"
+            }
+          },
+          {
+            "name": "rootId",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "format": "int64"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "*/*": {
+                "schema": {
+                  "$ref": "#/components/schemas/ResultString"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/shares/cancel": {
+      "delete": {
+        "tags": [
+          "分享模块"
+        ],
+        "summary": "删除分享",
+        "description": "删除指定的分享链接",
+        "operationId": "cancelSharedFile",
+        "parameters": [
+          {
+            "name": "shareId",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "format": "int64"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "*/*": {
+                "schema": {
+                  "$ref": "#/components/schemas/Result"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/ai/stream/chat": {
+      "post": {
+        "tags": [
+          "AI应用"
+        ],
+        "summary": "AI对话",
+        "description": "流式输出并输出引用文档",
+        "operationId": "streamChat",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ChatRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "text/event-stream": {
+                "schema": {
+                  "$ref": "#/components/schemas/SseEmitter"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/ai/process": {
+      "post": {
+        "tags": [
+          "AI应用"
+        ],
+        "summary": "处理已有文件",
+        "description": "处理当前用户拥有的文档",
+        "operationId": "processExistingDocument",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/DocumentProcessRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "*/*": {
+                "schema": {
+                  "$ref": "#/components/schemas/ResultString"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/ai/list": {
+      "get": {
+        "tags": [
+          "history-controller"
+        ],
+        "operationId": "listHistory",
+        "parameters": [
+          {
+            "name": "sessionId",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "cursor",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "*/*": {
+                "schema": {
+                  "$ref": "#/components/schemas/ResultCursorPageResultChatMessage"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/ai/list-session": {
+      "get": {
+        "tags": [
+          "history-controller"
+        ],
+        "operationId": "listSessions",
+        "parameters": [
+          {
+            "name": "cursor",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "*/*": {
+                "schema": {
+                  "$ref": "#/components/schemas/ResultCursorPageResultChatSession"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/ai/delete": {
+      "delete": {
+        "tags": [
+          "history-controller"
+        ],
+        "operationId": "deleteSession",
+        "parameters": [
+          {
+            "name": "sessionId",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "*/*": {
+                "schema": {
+                  "$ref": "#/components/schemas/Result"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/auth/register": {
+      "post": {
+        "tags": [
+          "认证模块"
+        ],
+        "summary": "注册",
+        "description": "根据登录凭证（目前为用户名）和密码注册",
+        "operationId": "register",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/RegisterRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "*/*": {
+                "schema": {
+                  "$ref": "#/components/schemas/ResultRegisterResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/auth/login": {
+      "post": {
+        "tags": [
+          "认证模块"
+        ],
+        "summary": "登录",
+        "description": "根据登录凭证（目前为用户名）和密码登录",
+        "operationId": "login",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/LoginRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "*/*": {
+                "schema": {
+                  "$ref": "#/components/schemas/ResultLoginResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+  },
+  "components": {
+    "schemas": {
+      "MergeRequestV2": {
+        "type": "object",
+        "properties": {
+          "uploadId": {
+            "type": "string"
+          },
+          "parts": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/PartInfo"
+            }
+          }
+        }
+      },
+      "PartInfo": {
+        "type": "object",
+        "properties": {
+          "partNumber": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "etag": {
+            "type": "string"
+          }
+        }
+      },
+      "InitRequestV2": {
+        "required": [
+          "fileHash",
+          "fileName",
+          "fileSize"
+        ],
+        "type": "object",
+        "properties": {
+          "fileName": {
+            "type": "string",
+            "description": "文件名",
+            "example": "file.ext"
+          },
+          "fileSize": {
+            "type": "integer",
+            "description": "文件大小（字节）",
+            "format": "int64",
+            "example": 1024
+          },
+          "fileHash": {
+            "type": "string",
+            "description": "文件的前1MB的Md5",
+            "example": "3b1254bd7f1f14ce0d5caca25626733b"
+          },
+          "chunkSize": {
+            "type": "integer",
+            "description": "分块的大小（字节）",
+            "format": "int64",
+            "example": 1024
+          },
+          "parentId": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "totalChunks": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "uploadId": {
+            "type": "string"
+          }
+        },
+        "description": "初始化上传请求的请求体"
+      },
+      "InitResponseV2": {
+        "type": "object",
+        "properties": {
+          "uploadId": {
+            "type": "string"
+          },
+          "chunkSize": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "presignedUrls": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "uploadedChunks": {
+            "uniqueItems": true,
+            "type": "array",
+            "items": {
+              "type": "integer",
+              "format": "int32"
+            }
+          },
+          "isComplete": {
+            "type": "boolean"
+          }
+        }
+      },
+      "MergeRequest": {
+        "type": "object",
+        "properties": {
+          "sessionId": {
+            "type": "string",
+            "description": "会话ID",
+            "example": "550e8400e29b41d4a716446655440000"
+          }
+        },
+        "description": "合并请求体"
+      },
+      "Result": {
+        "type": "object",
+        "properties": {
+          "code": {
+            "type": "integer",
+            "description": "响应状态码，1表示成功",
+            "format": "int32",
+            "example": 1
+          },
+          "msg": {
+            "type": "string",
+            "description": "响应消息",
+            "example": "操作成功"
+          },
+          "data": {
+            "type": "object",
+            "description": "响应数据"
+          }
+        },
+        "description": "通用响应对象"
+      },
+      "InitRequest": {
+        "required": [
+          "fileName",
+          "fileSize",
+          "isFolderUpload",
+          "md5",
+          "parentId"
+        ],
+        "type": "object",
+        "properties": {
+          "fileName": {
+            "type": "string",
+            "description": "文件名",
+            "example": "file.ext"
+          },
+          "relativePath": {
+            "type": "string",
+            "description": "相对路径",
+            "example": "path/to/file.ext"
+          },
+          "fileSize": {
+            "type": "integer",
+            "description": "文件大小（字节）",
+            "format": "int64",
+            "example": 1024
+          },
+          "md5": {
+            "type": "string",
+            "description": "文件的前1MB的Md5",
+            "example": "3b1254bd7f1f14ce0d5caca25626733b"
+          },
+          "chunkSize": {
+            "type": "integer",
+            "description": "分块的大小（字节）",
+            "format": "int64",
+            "example": 1024
+          },
+          "parentId": {
+            "type": "integer",
+            "description": "父目录ID",
+            "format": "int64",
+            "example": 1001
+          },
+          "isFolderUpload": {
+            "type": "boolean",
+            "description": "是否为文件夹上传",
+            "example": true
+          }
+        },
+        "description": "初始化上传请求的请求体"
+      },
+      "ResultUploadSession": {
+        "type": "object",
+        "properties": {
+          "code": {
+            "type": "integer",
+            "description": "响应状态码，1表示成功",
+            "format": "int32",
+            "example": 1
+          },
+          "msg": {
+            "type": "string",
+            "description": "响应消息",
+            "example": "操作成功"
+          },
+          "data": {
+            "$ref": "#/components/schemas/UploadSession"
+          }
+        },
+        "description": "通用响应对象"
+      },
+      "UploadSession": {
+        "type": "object",
+        "properties": {
+          "sessionId": {
+            "type": "string"
+          },
+          "status": {
+            "type": "string"
+          },
+          "userId": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "fileName": {
+            "type": "string"
+          },
+          "fileSize": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "md5": {
+            "type": "string"
+          },
+          "ossKey": {
+            "type": "string"
+          },
+          "totalChunks": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "parentId": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "relativePath": {
+            "type": "string"
+          },
+          "isFolderUpload": {
+            "type": "boolean"
+          },
+          "presignedUrl": {
+            "type": "string"
+          }
+        },
+        "description": "响应数据"
+      },
+      "UploadChunkRequest": {
+        "type": "object",
+        "properties": {
+          "sessionId": {
+            "type": "string",
+            "description": "会话ID",
+            "example": "550e8400e29b41d4a716446655440000"
+          },
+          "chunkIndex": {
+            "type": "integer",
+            "description": "分片索引，从0开始",
+            "format": "int32",
+            "example": 0
+          },
+          "md5": {
+            "type": "string",
+            "description": "整个分片的Md5",
+            "example": "3b1254bd7f1f14ce0d5caca25626733b"
+          }
+        },
+        "description": "分片元数据"
+      },
+      "ResultUploadProgress": {
+        "type": "object",
+        "properties": {
+          "code": {
+            "type": "integer",
+            "description": "响应状态码，1表示成功",
+            "format": "int32",
+            "example": 1
+          },
+          "msg": {
+            "type": "string",
+            "description": "响应消息",
+            "example": "操作成功"
+          },
+          "data": {
+            "$ref": "#/components/schemas/UploadProgress"
+          }
+        },
+        "description": "通用响应对象"
+      },
+      "UploadProgress": {
+        "type": "object",
+        "properties": {
+          "sessionId": {
+            "type": "string",
+            "description": "会话ID",
+            "example": "550e8400e29b41d4a716446655440000"
+          },
+          "fileName": {
+            "type": "string",
+            "description": "文件名",
+            "example": "file.ext"
+          },
+          "status": {
+            "type": "string",
+            "description": "上传状态",
+            "example": "UPLOADING"
+          },
+          "uploadedChunks": {
+            "type": "integer",
+            "description": "已上传分片",
+            "format": "int32"
+          },
+          "totalChunks": {
+            "type": "integer",
+            "description": "总的分片数量",
+            "format": "int32",
+            "example": 100
+          },
+          "progress": {
+            "type": "number",
+            "description": "上传进度",
+            "format": "double",
+            "example": 0.55
+          },
+          "ossKey": {
+            "type": "string",
+            "description": "物理文件对象键",
+            "example": "path/to/file"
+          }
+        },
+        "description": "用于返回前端的上传进度查询返回体"
+      },
+      "CancelRequest": {
+        "required": [
+          "sessionId"
+        ],
+        "type": "object",
+        "properties": {
+          "sessionId": {
+            "type": "string",
+            "description": "上传会话ID（由初始化接口返回）",
+            "example": "550e8400e29b41d4a716446655440000"
+          }
+        },
+        "description": "取消上传请求体"
+      },
+      "ResultVoid": {
+        "type": "object",
+        "properties": {
+          "code": {
+            "type": "integer",
+            "description": "响应状态码，1表示成功",
+            "format": "int32",
+            "example": 1
+          },
+          "msg": {
+            "type": "string",
+            "description": "响应消息",
+            "example": "操作成功"
+          },
+          "data": {
+            "type": "object",
+            "description": "响应数据"
+          }
+        },
+        "description": "通用响应对象"
+      },
+      "FileItemType": {
+        "type": "string",
+        "description": "文件/文件夹类型",
+        "example": "FILE",
+        "enum": [
+          "FILE",
+          "FOLDER"
+        ]
+      },
+      "ItemIdentity": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "integer",
+            "description": "文件/文件夹ID",
+            "format": "int64",
+            "example": 1001
+          },
+          "type": {
+            "$ref": "#/components/schemas/FileItemType"
+          }
+        },
+        "description": "简易对象实体",
+        "example": [
+          {
+            "id": 100,
+            "type": "FILE"
+          },
+          {
+            "id": 200,
+            "type": "FOLDER"
+          }
+        ]
+      },
+      "RestoreRequest": {
+        "type": "object",
+        "properties": {
+          "items": {
+            "type": "array",
+            "description": "待还原的文件/文件夹标识列表",
+            "example": [
+              {
+                "id": 100,
+                "type": "FILE"
+              },
+              {
+                "id": 200,
+                "type": "FOLDER"
+              }
+            ],
+            "items": {
+              "$ref": "#/components/schemas/ItemIdentity"
+            }
+          }
+        },
+        "description": "批量还原请求体"
+      },
+      "RenameRequest": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "integer",
+            "description": "文件/文件夹Id",
+            "format": "int64",
+            "example": 1001
+          },
+          "newName": {
+            "type": "string",
+            "description": "新名字",
+            "example": "new Name"
+          },
+          "type": {
+            "$ref": "#/components/schemas/FileItemType"
+          }
+        },
+        "description": "用于文件/文件夹重命名的请求体"
+      },
+      "MoveRequest": {
+        "type": "object",
+        "properties": {
+          "items": {
+            "type": "array",
+            "description": "待删除的文件/文件夹标识列表（支持混合删除）",
+            "example": [
+              {
+                "id": 100,
+                "type": "FILE"
+              },
+              {
+                "id": 200,
+                "type": "FOLDER"
+              }
+            ],
+            "items": {
+              "$ref": "#/components/schemas/ItemIdentity"
+            }
+          },
+          "parentId": {
+            "type": "integer",
+            "description": "目标父目录Id",
+            "format": "int64",
+            "example": 1001
+          }
+        },
+        "description": "移动文件/文件夹的请求体"
+      },
+      "CreateFolderRequest": {
+        "required": [
+          "name",
+          "parentId"
+        ],
+        "type": "object",
+        "properties": {
+          "parentId": {
+            "type": "integer",
+            "description": "父目录ID，若为0表示根目录",
+            "format": "int64",
+            "example": 1001
+          },
+          "name": {
+            "maxLength": 255,
+            "minLength": 1,
+            "type": "string",
+            "description": "文件夹名称",
+            "example": "工作文档"
+          }
+        },
+        "description": "创建文件夹请求体"
+      },
+      "ResultString": {
+        "type": "object",
+        "properties": {
+          "code": {
+            "type": "integer",
+            "description": "响应状态码，1表示成功",
+            "format": "int32",
+            "example": 1
+          },
+          "msg": {
+            "type": "string",
+            "description": "响应消息",
+            "example": "操作成功"
+          },
+          "data": {
+            "type": "string",
+            "description": "响应数据"
+          }
+        },
+        "description": "通用响应对象"
+      },
+      "PageResultRecycleFileVO": {
+        "type": "object",
+        "properties": {
+          "total": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "pages": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "current": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "size": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "list": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/RecycleFileVO"
+            }
+          }
+        },
+        "description": "响应数据"
+      },
+      "RecycleFileVO": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "integer",
+            "description": "文件/文件夹ID",
+            "format": "int64",
+            "example": 1001
+          },
+          "name": {
+            "type": "string",
+            "description": "文件/文件夹名称",
+            "example": "name"
+          },
+          "size": {
+            "type": "integer",
+            "description": "文件大小（字节）",
+            "format": "int64",
+            "example": 1024
+          },
+          "deletedAt": {
+            "type": "string",
+            "description": "删除时间",
+            "format": "date-time"
+          },
+          "type": {
+            "$ref": "#/components/schemas/FileItemType"
+          }
+        },
+        "description": "用于前端回收站展示的视图对象"
+      },
+      "ResultPageResultRecycleFileVO": {
+        "type": "object",
+        "properties": {
+          "code": {
+            "type": "integer",
+            "description": "响应状态码，1表示成功",
+            "format": "int32",
+            "example": 1
+          },
+          "msg": {
+            "type": "string",
+            "description": "响应消息",
+            "example": "操作成功"
+          },
+          "data": {
+            "$ref": "#/components/schemas/PageResultRecycleFileVO"
+          }
+        },
+        "description": "通用响应对象"
+      },
+      "ResultListVirtualFileVO": {
+        "type": "object",
+        "properties": {
+          "code": {
+            "type": "integer",
+            "description": "响应状态码，1表示成功",
+            "format": "int32",
+            "example": 1
+          },
+          "msg": {
+            "type": "string",
+            "description": "响应消息",
+            "example": "操作成功"
+          },
+          "data": {
+            "type": "array",
+            "description": "响应数据",
+            "items": {
+              "$ref": "#/components/schemas/VirtualFileVO"
+            }
+          }
+        },
+        "description": "通用响应对象"
+      },
+      "VirtualFileVO": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "integer",
+            "description": "文件/文件夹ID",
+            "format": "int64",
+            "example": 1001
+          },
+          "name": {
+            "type": "string",
+            "description": "文件/文件夹名称",
+            "example": "name"
+          },
+          "size": {
+            "type": "integer",
+            "description": "文件大小（字节）",
+            "format": "int64",
+            "example": 1024
+          },
+          "updateTime": {
+            "type": "string",
+            "description": "最后更新时间",
+            "format": "date-time"
+          },
+          "type": {
+            "$ref": "#/components/schemas/FileItemType"
+          },
+          "parentId": {
+            "type": "integer",
+            "description": "父目录ID",
+            "format": "int64",
+            "example": 1001
+          }
+        },
+        "description": "用于前端展示的视图对象"
+      },
+      "DeleteRequest": {
+        "type": "object",
+        "properties": {
+          "items": {
+            "type": "array",
+            "description": "待删除的文件/文件夹标识列表（支持混合删除）",
+            "example": [
+              {
+                "id": 100,
+                "type": "FILE"
+              },
+              {
+                "id": 200,
+                "type": "FOLDER"
+              }
+            ],
+            "items": {
+              "$ref": "#/components/schemas/ItemIdentity"
+            }
+          }
+        },
+        "description": "批量删除请求体"
+      },
+      "CreateShareRequest": {
+        "type": "object",
+        "properties": {
+          "password": {
+            "type": "string",
+            "description": "提取码",
+            "example": "abcde"
+          },
+          "expireTime": {
+            "type": "string",
+            "description": "过期时间",
+            "format": "date-time"
+          },
+          "displayName": {
+            "type": "string"
+          },
+          "items": {
+            "type": "array",
+            "description": "分享的文件/文件夹对象",
+            "example": [
+              {
+                "id": 100,
+                "type": "FILE"
+              },
+              {
+                "id": 200,
+                "type": "FOLDER"
+              }
+            ],
+            "items": {
+              "$ref": "#/components/schemas/ShareItem"
+            }
+          }
+        },
+        "description": "创建分享的请求体"
+      },
+      "ShareItem": {
+        "type": "object",
+        "properties": {
+          "targetId": {
+            "type": "integer",
+            "description": "文件/文件夹ID",
+            "format": "int64",
+            "example": 1001
+          },
+          "targetType": {
+            "$ref": "#/components/schemas/FileItemType"
+          }
+        },
+        "description": "分享的文件/文件夹对象",
+        "example": [
+          {
+            "id": 100,
+            "type": "FILE"
+          },
+          {
+            "id": 200,
+            "type": "FOLDER"
+          }
+        ]
+      },
+      "CreateShareResponse": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "integer",
+            "description": "分享链接ID",
+            "format": "int64",
+            "example": 1001
+          },
+          "shareCode": {
+            "type": "string",
+            "description": "分享链接唯一码(前端拼接URL)",
+            "example": "aaabbbccc"
+          },
+          "password": {
+            "type": "string",
+            "description": "提取码",
+            "example": "abcde"
+          },
+          "expireTime": {
+            "type": "string",
+            "description": "过期时间",
+            "format": "date-time"
+          },
+          "createTime": {
+            "type": "string",
+            "description": "创建分享时间",
+            "format": "date-time"
+          }
+        },
+        "description": "创建分享的响应体 "
+      },
+      "ResultCreateShareResponse": {
+        "type": "object",
+        "properties": {
+          "code": {
+            "type": "integer",
+            "description": "响应状态码，1表示成功",
+            "format": "int32",
+            "example": 1
+          },
+          "msg": {
+            "type": "string",
+            "description": "响应消息",
+            "example": "操作成功"
+          },
+          "data": {
+            "$ref": "#/components/schemas/CreateShareResponse"
+          }
+        },
+        "description": "通用响应对象"
+      },
+      "TransferRequest": {
+        "type": "object",
+        "properties": {
+          "targetFolderId": {
+            "type": "integer",
+            "description": "目标文件夹id（访问者视角下的文件列表）",
+            "format": "int64",
+            "example": 1001
+          },
+          "items": {
+            "type": "array",
+            "description": "待转存的文件/文件夹标识",
+            "example": [
+              {
+                "id": 100,
+                "type": "FILE"
+              },
+              {
+                "id": 200,
+                "type": "FOLDER"
+              }
+            ],
+            "items": {
+              "$ref": "#/components/schemas/ItemIdentity"
+            }
+          },
+          "rootId": {
+            "type": "integer",
+            "description": "源文件夹的顶级文件夹id（访问者视角下的文件列表）",
+            "format": "int64",
+            "example": 1001
+          }
+        }
+      },
+      "PageResultShareLinkVO": {
+        "type": "object",
+        "properties": {
+          "total": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "pages": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "current": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "size": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "list": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ShareLinkVO"
+            }
+          }
+        },
+        "description": "响应数据"
+      },
+      "ResultPageResultShareLinkVO": {
+        "type": "object",
+        "properties": {
+          "code": {
+            "type": "integer",
+            "description": "响应状态码，1表示成功",
+            "format": "int32",
+            "example": 1
+          },
+          "msg": {
+            "type": "string",
+            "description": "响应消息",
+            "example": "操作成功"
+          },
+          "data": {
+            "$ref": "#/components/schemas/PageResultShareLinkVO"
+          }
+        },
+        "description": "通用响应对象"
+      },
+      "ShareLinkVO": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "integer",
+            "description": "分享链接ID",
+            "format": "int64",
+            "example": 1001
+          },
+          "shareCode": {
+            "type": "string",
+            "description": "分享链接唯一码(前端拼接URL)",
+            "example": "aaabbbccc"
+          },
+          "password": {
+            "type": "string",
+            "description": "提取码",
+            "example": "abcde"
+          },
+          "expireTime": {
+            "type": "string",
+            "description": "过期时间",
+            "format": "date-time"
+          },
+          "status": {
+            "$ref": "#/components/schemas/ShareStatus"
+          },
+          "createTime": {
+            "type": "string",
+            "description": "创建时间",
+            "format": "date-time"
+          },
+          "updateTime": {
+            "type": "string",
+            "description": "最后更新时间",
+            "format": "date-time"
+          },
+          "displayName": {
+            "type": "string",
+            "description": "分享链接显示名称",
+            "example": "分享"
+          }
+        },
+        "description": "用于前端返回的视图对象"
+      },
+      "ShareStatus": {
+        "type": "string",
+        "description": "分享链接状态",
+        "example": "ACTIVE",
+        "enum": [
+          "NO_ACTIVE",
+          "ACTIVE"
+        ]
+      },
+      "ChatRequest": {
+        "type": "object",
+        "properties": {
+          "message": {
+            "type": "string"
+          },
+          "sessionId": {
+            "type": "string"
+          }
+        }
+      },
+      "SseEmitter": {
+        "type": "object",
+        "properties": {
+          "timeout": {
+            "type": "integer",
+            "format": "int64"
+          }
+        }
+      },
+      "DocumentProcessRequest": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "integer",
+            "description": "用户文件ID",
+            "format": "int64",
+            "example": 1001
+          }
+        },
+        "description": "RAG处理请求体"
+      },
+      "ChatMessage": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "sessionId": {
+            "type": "string"
+          },
+          "role": {
+            "type": "string"
+          },
+          "content": {
+            "type": "string"
+          },
+          "createTime": {
+            "type": "string",
+            "format": "date-time"
+          }
+        }
+      },
+      "CursorPageResultChatMessage": {
+        "type": "object",
+        "properties": {
+          "list": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ChatMessage"
+            }
+          },
+          "nextCursor": {
+            "type": "string"
+          },
+          "hasNext": {
+            "type": "boolean"
+          }
+        },
+        "description": "响应数据"
+      },
+      "ResultCursorPageResultChatMessage": {
+        "type": "object",
+        "properties": {
+          "code": {
+            "type": "integer",
+            "description": "响应状态码，1表示成功",
+            "format": "int32",
+            "example": 1
+          },
+          "msg": {
+            "type": "string",
+            "description": "响应消息",
+            "example": "操作成功"
+          },
+          "data": {
+            "$ref": "#/components/schemas/CursorPageResultChatMessage"
+          }
+        },
+        "description": "通用响应对象"
+      },
+      "ChatSession": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "sessionId": {
+            "type": "string"
+          },
+          "userId": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "title": {
+            "type": "string"
+          },
+          "messageCount": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "createTime": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "updateTime": {
+            "type": "string",
+            "format": "date-time"
+          }
+        }
+      },
+      "CursorPageResultChatSession": {
+        "type": "object",
+        "properties": {
+          "list": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ChatSession"
+            }
+          },
+          "nextCursor": {
+            "type": "string"
+          },
+          "hasNext": {
+            "type": "boolean"
+          }
+        },
+        "description": "响应数据"
+      },
+      "ResultCursorPageResultChatSession": {
+        "type": "object",
+        "properties": {
+          "code": {
+            "type": "integer",
+            "description": "响应状态码，1表示成功",
+            "format": "int32",
+            "example": 1
+          },
+          "msg": {
+            "type": "string",
+            "description": "响应消息",
+            "example": "操作成功"
+          },
+          "data": {
+            "$ref": "#/components/schemas/CursorPageResultChatSession"
+          }
+        },
+        "description": "通用响应对象"
+      },
+      "RegisterRequest": {
+        "required": [
+          "password"
+        ],
+        "type": "object",
+        "properties": {
+          "username": {
+            "maxLength": 20,
+            "minLength": 3,
+            "type": "string",
+            "description": "用户名",
+            "example": "aaabbbccc"
+          },
+          "email": {
+            "maxLength": 50,
+            "minLength": 0,
+            "type": "string",
+            "description": "邮箱",
+            "example": "example@ex.com"
+          },
+          "phone": {
+            "maxLength": 20,
+            "minLength": 0,
+            "type": "string",
+            "description": "手机号码",
+            "example": "+00 123456789"
+          },
+          "password": {
+            "maxLength": 20,
+            "minLength": 6,
+            "type": "string",
+            "description": "密码",
+            "example": "123abc"
+          }
+        }
+      },
+      "RegisterResponse": {
+        "type": "object",
+        "properties": {
+          "userId": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "username": {
+            "type": "string"
+          },
+          "email": {
+            "type": "string"
+          },
+          "phone": {
+            "type": "string"
+          }
+        },
+        "description": "响应数据"
+      },
+      "ResultRegisterResponse": {
+        "type": "object",
+        "properties": {
+          "code": {
+            "type": "integer",
+            "description": "响应状态码，1表示成功",
+            "format": "int32",
+            "example": 1
+          },
+          "msg": {
+            "type": "string",
+            "description": "响应消息",
+            "example": "操作成功"
+          },
+          "data": {
+            "$ref": "#/components/schemas/RegisterResponse"
+          }
+        },
+        "description": "通用响应对象"
+      },
+      "LoginRequest": {
+        "required": [
+          "loginAccount",
+          "password"
+        ],
+        "type": "object",
+        "properties": {
+          "loginAccount": {
+            "type": "string",
+            "description": "登录凭证（目前为用户名）",
+            "example": "aaabbbccc"
+          },
+          "password": {
+            "type": "string",
+            "description": "登录密码",
+            "example": "123abc"
+          }
+        },
+        "description": "取消上传请求体"
+      },
+      "LoginResponse": {
+        "type": "object",
+        "properties": {
+          "token": {
+            "type": "string",
+            "description": "登录token",
+            "example": "aaabbbccc"
+          },
+          "nickname": {
+            "type": "string",
+            "description": "昵称",
+            "example": "nickname"
+          },
+          "username": {
+            "type": "string"
+          },
+          "phone": {
+            "type": "string"
+          },
+          "email": {
+            "type": "string"
+          },
+          "expiresIn": {
+            "type": "integer",
+            "description": "过期时间",
+            "format": "int64"
+          },
+          "rootFolderId": {
+            "type": "integer",
+            "description": "根目录Id",
+            "format": "int64",
+            "example": 1001
+          },
+          "rootFolderName": {
+            "type": "string",
+            "description": "根目录名称",
+            "example": "folderName"
+          }
+        },
+        "description": "响应数据"
+      },
+      "ResultLoginResponse": {
+        "type": "object",
+        "properties": {
+          "code": {
+            "type": "integer",
+            "description": "响应状态码，1表示成功",
+            "format": "int32",
+            "example": 1
+          },
+          "msg": {
+            "type": "string",
+            "description": "响应消息",
+            "example": "操作成功"
+          },
+          "data": {
+            "$ref": "#/components/schemas/LoginResponse"
+          }
+        },
+        "description": "通用响应对象"
+      }
+    }
+  }
+}

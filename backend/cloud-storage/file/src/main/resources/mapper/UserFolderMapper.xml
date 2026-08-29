@@ -1,0 +1,97 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+        "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="demo.cloud.file.mapper.UserFolderMapper">
+    <insert id="insertOrUpdateIgnore">
+        INSERT INTO user_folder (user_id, parent_id, name, create_time, update_time, deleted_at)
+        VALUES (#{userId}, #{parentId}, #{name}, NOW(), NOW(), NULL)
+        ON DUPLICATE KEY UPDATE
+            deleted_at = NULL,
+            update_time = NOW()
+    </insert>
+
+
+
+    <select id="checkPermissionByCTE" resultType="Boolean">
+        WITH RECURSIVE permission_check AS (
+            SELECT id, parent_id
+            FROM user_folder
+            WHERE id = #{targetId}
+                AND deleted_at IS NULL
+            UNION ALL
+            SELECT f.id, f.parent_id
+            FROM user_folder f
+            INNER JOIN permission_check pc ON f.id = pc.parent_id
+            WHERE f.deleted_at IS NULL
+                AND pc.id != #{rootId}
+                AND pc.parent_id != 0
+        )
+        SELECT EXISTS(
+            SELECT 1
+            FROM permission_check
+            WHERE id = #{rootId}
+        )
+    </select>
+
+
+    <select id="filterItemsUnderRoot" resultType="demo.cloud.file.dto.ItemIdentity">
+        WITH RECURSIVE folder_tree AS (
+        <!-- 1. 递归起点：根文件夹本身（确保未被删除） -->
+        SELECT id, parent_id
+        FROM user_folder
+        WHERE id = #{rootId}
+        AND deleted_at IS NULL
+
+        UNION ALL
+
+        <!-- 2. 向下递归获取所有子孙文件夹 -->
+        SELECT f.id, f.parent_id
+        FROM user_folder f
+        INNER JOIN folder_tree ft ON f.parent_id = ft.id
+        WHERE f.deleted_at IS NULL
+        ),
+        <!-- 3. 所有有效文件夹 ID（包含 rootId 自身） -->
+        valid_folder_ids AS (
+        SELECT id FROM folder_tree
+        ),
+        <!-- 4. 所有在有效文件夹下的有效文件 ID -->
+        valid_file_ids AS (
+        SELECT f.id
+        FROM user_file f
+        WHERE f.parent_id IN (SELECT id FROM valid_folder_ids)
+        AND f.deleted_at IS NULL
+        ),
+        <!-- 5. 构造输入条目虚拟表（UNION ALL 方式传入列表） -->
+        input_items AS (
+        <foreach collection="items" item="item" separator="UNION ALL">
+            SELECT #{item.id} AS id, #{item.type} AS type
+        </foreach>
+        )
+        <!-- 6. 过滤：只保留匹配的条目（FOLDER -> 在 valid_folder_ids 中，FILE -> 在 valid_file_ids 中） -->
+        SELECT DISTINCT input.id, input.type
+        FROM input_items input
+        WHERE
+        (input.type = 0 AND input.id IN (SELECT id FROM valid_folder_ids))
+        OR
+        (input.type = 1 AND input.id IN (SELECT id FROM valid_file_ids))
+    </select>
+
+
+    <select id="selectSubTreeBatch" resultType="demo.cloud.file.pojo.UserFolder">
+        WITH RECURSIVE folder_tree AS (
+        SELECT * FROM user_folder
+        WHERE id IN
+        <foreach collection="rootIds" item="id" open="(" separator="," close=")">
+            #{id}
+        </foreach>
+        AND deleted_at is null
+
+        UNION ALL
+
+        SELECT f.* FROM user_folder f
+        INNER JOIN folder_tree ft ON f.parent_id = ft.id
+        WHERE f.deleted_at is null       <!-- 仅按删除状态过滤，不再限制 userId -->
+        )
+        SELECT * FROM folder_tree
+    </select>
+</mapper>

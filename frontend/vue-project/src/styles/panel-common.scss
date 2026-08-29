@@ -1,0 +1,110 @@
+// src/styles/panel-common.scss
+
+/* ---------- 面板容器 ---------- */
+.base-panel {
+  flex: 1;
+  background: white;
+  border-radius: 20px;
+  box-shadow: 0 2px 8px rgba(0, 20, 40, 0.04);
+  border: 1px solid #edf1f9;
+  padding: 20px 0 0 0;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  min-width: 0;
+}
+
+/* ---------- 通用表格样式（覆盖 Element Plus） ---------- */
+.base-table {
+  flex: 1;
+  border: none;
+  overflow: auto;
+  width: 100%;
+
+  :deep(.el-table__header-wrapper) .el-table__cell {
+    background-color: transparent;
+    border-bottom: 1px solid #f0f4fc;
+    color: #6b81a0;
+    font-weight: 500;
+    font-size: 12px;
+    padding: 8px 0;
+  }
+
+  :deep(.el-table__body-wrapper) .el-table__cell {
+    border-bottom: none;
+    padding: 6px 0;
+  }
+
+  :deep(.el-table__row) {
+    border-radius: 8px;
+    transition: background 0.1s;
+
+    &:hover {
+      background-color: #f0f4fc;
+    }
+  }
+
+  :deep(.el-table__row--striped) {
+    background: transparent;
+  }
+
+  :deep(.el-table-column--selection .cell) {
+    padding: 0 4px;
+  }
+
+  :deep(.el-table__body .cell) {
+    color: #4a617e;
+    font-size: 13px;
+  }
+}
+
+/* ---------- 文件名单元格 + 悬浮操作 ---------- */
+.base-name-cell {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  position: relative;
+  width: 100%;
+  min-width: 0;
+
+  .file-icon {
+    flex-shrink: 0;
+  }
+
+  .file-name {
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+
+  .hover-actions {
+    display: flex;
+    gap: 4px;
+    opacity: 0;
+    transition: opacity 0.15s;
+    position: absolute;
+    right: 0;
+    top: 50%;
+    transform: translateY(-50%);
+    background-color: transparent;  // 透明，与行背景融合
+    padding-left: 30px;
+    padding-right: 4px;
+
+    .action-btn {
+      cursor: pointer;
+      color: #6b81a0;
+      padding: 6px;
+      border-radius: 4px;
+      font-size: 14px;
+
+      &:hover {
+        background-color: #e8edf5;
+        color: #1a5cff;
+      }
+    }
+  }
+
+  &:hover .hover-actions {
+    opacity: 1;
+  }
+}
