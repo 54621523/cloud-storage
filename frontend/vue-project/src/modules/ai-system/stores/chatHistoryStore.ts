@@ -8,12 +8,16 @@ import { useProcessExistingDocument } from '@/api/ai应用';
 import { useListHistory } from '@/api/history-controller';
 import { useChatSessionStore } from '@/modules/ai-system/stores/chatSessionStore';
 
+import { createSSEClient } from '@/composables/useSSE'
+
+
 export interface ChatMessage extends message {
     sources?: Array<{ filename?: string; page_number?: number; text?: string }>;
 }
 
 export const useChatMessageStore = defineStore('chatMessage', () => {
     const sessionStore = useChatSessionStore();
+
 
     // ========== 消息缓存 ==========
     const messagesMap = ref<Record<string, ChatMessage[]>>({});
@@ -134,136 +138,145 @@ export const useChatMessageStore = defineStore('chatMessage', () => {
     }
 
     // ========== SSE 流式生成回复 ==========
+
+    const sseClient = createSSEClient({
+        url: '/api/ai/stream/chat',
+        headers: {
+            'Content-Type': 'application/json',
+            Authorization: `Bearer ${localStorage.getItem('token')}`,
+        },
+    })
+
+    function setupListeners() {
+        const { sseBus } = sseClient
+
+        sseBus.addEventListener('_connected', () => {
+            console.log('🔌 SSE 连接已建立')
+        })
+
+        sseBus.addEventListener('_closed', () => {
+            console.log('🔚 SSE 连接已关闭')
+        })
+
+        sseBus.addEventListener('_error', (err: Error) => {
+            console.error('❌ SSE 错误:', err)
+        })
+
+        sseBus.addEventListener('session_created', (data) => {
+            const sessionStore = useChatSessionStore()
+            const realId = data?.data || data?.session_id
+            const currentSessionId = sessionStore.currentSessionId
+
+            if (realId && realId !== currentSessionId) {
+                // 迁移消息缓存
+                const tempMsgs = messagesMap.value[currentSessionId!] || []
+                messagesMap.value[realId] = tempMsgs
+                delete messagesMap.value[currentSessionId!]
+
+                // 迁移分页状态
+                const tempP = paginationMap.value[currentSessionId!]
+                if (tempP) {
+                    paginationMap.value[realId] = tempP
+                    delete paginationMap.value[currentSessionId!]
+                }
+
+                sessionStore.replaceTemporarySession(currentSessionId!, realId)
+            }
+        })
+
+        sseBus.addEventListener('stream_chunk', (data) => {
+            const sessionStore = useChatSessionStore()
+            const sessionId = sessionStore.currentSessionId
+            const targetList = messagesMap.value[sessionId!]
+            if (!targetList) return
+            const targetMsg = targetList[targetList.length - 1]
+            if (targetMsg?.role === 'assistant') {
+                targetMsg.content += data?.content || ''
+            }
+        })
+
+        sseBus.addEventListener('final_answer', (data) => {
+            const sessionStore = useChatSessionStore()
+            const sessionId = sessionStore.currentSessionId
+            const targetList = messagesMap.value[sessionId!]
+            if (!targetList) return
+            const targetMsg = targetList[targetList.length - 1]
+            if (targetMsg?.role === 'assistant') {
+                targetMsg.content = data?.content || targetMsg.content
+            }
+            sseClient.disconnect()
+        })
+
+        sseBus.addEventListener('references', (data) => {
+            // 处理引用数据
+        })
+
+        sseBus.addEventListener('error', (data) => {
+            const sessionStore = useChatSessionStore()
+            const sessionId = sessionStore.currentSessionId
+            const targetList = messagesMap.value[sessionId!]
+            if (targetList) {
+                const targetMsg = targetList[targetList.length - 1]
+                if (targetMsg?.role === 'assistant') {
+                    targetMsg.content = `[错误] ${data?.message || data}`
+                }
+            }
+        })
+    }
+
+    setupListeners()
     const isLoading = ref(false);
-    let abortController = new AbortController();
-
+    let generating = false;
     async function generateResponse(userMessage: string) {
-        // 1. 确保有会话 ID（若无则创建临时会话）
-        let sessionId = sessionStore.currentSessionId;
+        if (generating) {
+            console.warn('已有生成请求进行中，忽略本次调用')
+            return
+        }
+        generating = true
+        isLoading.value = true
+
+        const sessionStore = useChatSessionStore()
+        let sessionId = sessionStore.currentSessionId
+
         if (!sessionId) {
-            // 调用 sessionStore 创建临时会话（该方法应生成 ID 并加入会话列表，设置当前 ID）
-            sessionId = sessionStore.createTemporarySession(); // 需要在 sessionStore 中实现
-            // 并且初始化分页
-            initPaginationForSession(sessionId);
+            sessionId = sessionStore.createTemporarySession()
+            initPaginationForSession(sessionId)
         }
 
-        // 2. 添加 AI 占位消息
-        const aiMessage: ChatMessage = { role: 'assistant', content: '' };
-        addMessageToSession(sessionId, aiMessage);
-        const msgList = messagesMap.value[sessionId];
-        const botMsgIdx = msgList!.length - 1;
+        // 添加 AI 占位消息
+        const aiMessage: ChatMessage = { role: 'assistant', content: '' }
+        addMessageToSession(sessionId, aiMessage)
 
-        // 3. 准备请求
-        const request: ChatRequest = { message: userMessage };
-        // 如果是临时会话，不传 sessionId（让后端创建新会话）；否则传递真实 ID
-        const isTemp = sessionStore.isTemporarySession(sessionId); // 需在 sessionStore 提供
+        // 准备请求体
+        const request: ChatRequest = { message: userMessage }
+        const isTemp = sessionStore.isTemporarySession(sessionId)
         if (!isTemp) {
-            request.sessionId = sessionId;
+            request.sessionId = sessionId
         }
-
-        isLoading.value = true;
-        abortController = new AbortController();
 
         try {
-            await fetchEventSource('/api/ai/stream/chat', {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json',
-                    Authorization: `Bearer ${localStorage.getItem('token')}`,
-                },
-                body: JSON.stringify(request),
-                signal: abortController.signal,
-                onopen: async (response) => {
-                    if (!response.ok) throw new Error(`HTTP ${response.status}`);
-                },
-                onmessage: (event) => {
-                    const targetList = messagesMap.value[sessionId!];
-                    if (!targetList || targetList.length <= botMsgIdx) return;
-                    const targetMsg = targetList[botMsgIdx];
-                    if (!targetMsg) return;
-
-                    const eventType = event.event || 'stream_chunk';
-                    const dataStr = event.data;
-
-                    if (eventType === 'done' || dataStr === '[DONE]') {
-                        abortController.abort();
-                        return;
-                    }
-
-                    if (eventType === 'error') {
-                        targetMsg.content = `[错误] ${dataStr}`;
-                        return;
-                    }
-
-                    if (eventType === 'session_created') {
-                        try {
-                            const realId = JSON.parse(dataStr).data;
-                            if (realId && realId !== sessionId) {
-                                // 迁移消息缓存：将临时 ID 下的消息移到真实 ID
-                                const tempMsgs = messagesMap.value[sessionId!] || [];
-                                messagesMap.value[realId] = tempMsgs;
-                                delete messagesMap.value[sessionId!];
-
-                                // 迁移分页状态
-                                const tempP = paginationMap.value[sessionId!];
-                                if (tempP) {
-                                    paginationMap.value[realId] = tempP;
-                                    delete paginationMap.value[sessionId!];
-                                }
-
-                                // 通知 sessionStore 替换临时会话为真实会话
-                                sessionStore.replaceTemporarySession(sessionId!, realId);
-                                // 更新当前会话 ID（sessionStore 内部会做）
-                                // 注意：此时 sessionStore.currentSessionId 变为 realId，但我们的局部变量 sessionId 还是旧的
-                                // 因此需要更新局部变量，以便后续的 onmessage 能继续使用正确的 key
-                                sessionId = realId;
-                            }
-                        } catch (e) {
-                            console.warn('解析 session_created 失败:', dataStr, e);
-                        }
-                        return;
-                    }
-
-                    // 常规流式数据
-                    try {
-                        const parsed = dataStr ? JSON.parse(dataStr) : {};
-                        switch (eventType) {
-                            case 'references':
-                                // targetMsg.sources = parsed.data || [];
-                                break;
-                            case 'final_answer':
-                                targetMsg.content = parsed.content || targetMsg.content;
-                                break;
-                            case 'stream_chunk':
-                                targetMsg.content += parsed.content || '';
-                                break;
-                            default:
-                                if (parsed.content) targetMsg.content += parsed.content;
-                                break;
-                        }
-                    } catch (e) {
-                        console.warn('解析 SSE 数据失败:', dataStr, e);
-                    }
-                },
-                onclose: () => { },
-                onerror: (err) => {
-                    console.error('SSE onerror:', err);
-                    const targetList = messagesMap.value[sessionId!];
-                    if (targetList?.[botMsgIdx]) {
-                        targetList[botMsgIdx].content = '请求失败，请重试';
-                    }
-                    return undefined;
-                },
-            });
+            await sseClient.connect({
+                getBody: () => request,
+            })
         } catch (error) {
-            if (error instanceof Error && error.name === 'AbortError') return;
-            const targetList = messagesMap.value[sessionId];
-            if (targetList?.[botMsgIdx]) {
-                targetList[botMsgIdx].content = '请求异常，请重试';
+            if (error instanceof Error && error.name === 'AbortError') return
+            const targetList = messagesMap.value[sessionId]
+            if (targetList) {
+                const targetMsg = targetList[targetList.length - 1]
+                if (targetMsg?.role === 'assistant') {
+                    targetMsg.content = '请求异常，请重试'
+                }
             }
         } finally {
-            isLoading.value = false;
+            isLoading.value = false
+            generating = false
         }
+    }
+
+    function cancelGeneration() {
+        sseClient.disconnect()
+        generating = false
+        isLoading.value = false
     }
 
     // ========== 文档处理 ==========
@@ -290,6 +303,7 @@ export const useChatMessageStore = defineStore('chatMessage', () => {
         loadMoreHistory,
         processExistingDocument,
         isLoading,
+        cancelGeneration,
         // 暴露分页状态（可选）
         paginationMap,
     };

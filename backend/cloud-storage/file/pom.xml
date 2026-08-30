@@ -144,6 +144,17 @@
             <artifactId>knife4j-openapi3-jakarta-spring-boot-starter</artifactId>
         </dependency>
 
+        <dependency>
+            <groupId>com.meilisearch.sdk</groupId>
+            <artifactId>meilisearch-java</artifactId>
+        </dependency>
+        <dependency>
+            <groupId>demo.cloud</groupId>
+            <artifactId>auth-api</artifactId>
+            <version>0.0.1-SNAPSHOT</version>
+            <scope>compile</scope>
+        </dependency>
+
 
     </dependencies>
 </project>

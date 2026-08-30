@@ -15,7 +15,7 @@ import { provide, onBeforeUnmount, ref } from 'vue';
 import { useFileExplorer } from '@/modules/file-system/composables/useFileExplorer';
 import HomeTopBar from '@/modules/file-system/components/HomeTopBar.vue';
 import FilePanel from '@/modules/file-system/components/FilePanel.vue';
-import { FILE_EXPLORER_KEY } from '@/symbol';
+import { FILE_EXPLORER_KEY } from '@/constants/symbol';
 import type { FileItemUI } from '@/modules/file-system/types/file';
 import ShareDialog from '@/modules/file-system/components/ShareDialog.vue';
 import { ElMessage } from 'element-plus';

@@ -161,4 +161,76 @@ public class PythonController {
 
         return emitter;
     }
+
+    /**
+     * 模拟 AI 对话（测试用）
+     * 不调用 Python，直接构造 Mock SSE 事件流
+     */
+    @PreAuthorize("isAuthenticated()")
+    @Operation(summary = "模拟AI对话（测试）", description = "用于测试 SSE 流，不实际调用 Python 服务")
+    @PostMapping(value = "/stream/chat/mock", produces = MediaType.TEXT_EVENT_STREAM_VALUE)
+    public SseEmitter mockStreamChat(@RequestBody ChatRequest request) {
+        String sessionId = request.getSessionId();
+        // 若前端未传 sessionId，则生成一个模拟值
+        String validSessionId = (sessionId != null && !sessionId.isEmpty())
+                ? sessionId : "mock-session-" + System.currentTimeMillis();
+
+        SseEmitter emitter = new SseEmitter(300000L);
+
+        // 异步发送模拟数据
+        CompletableFuture.runAsync(() -> {
+            try {
+                // 1. 发送 session_created 事件
+                emitter.send(SseEmitter.event()
+                        .name("session_created")
+                        .data(Map.of("data", validSessionId)));
+
+                // 模拟流式返回内容（分多个 chunk）
+                String[] chunks = {
+                        "这是模拟的",
+                        "流式回复内容，",
+                        "分多次发送。",
+                        "可以测试前端展示效果。"
+                };
+                for (String chunk : chunks) {
+                    // 每个 chunk 封装为 {content: chunk}
+                    Map<String, String> data = Map.of("content", chunk);
+                    emitter.send(SseEmitter.event()
+                            .name("chunk")
+                            .data(data));
+                    Thread.sleep(300); // 模拟网络延迟
+                }
+
+                // 2. 发送 references 事件（模拟引用文档）
+                List<Map<String, Object>> refs = List.of(
+                        Map.of("doc_id", "101", "text", "这是文档1的片段", "page_number", 3),
+                        Map.of("doc_id", "102", "text", "这是文档2的片段", "page_number", 7)
+                );
+                Map<String, Object> refPayload = Map.of("data", refs);
+                emitter.send(SseEmitter.event()
+                        .name("references")
+                        .data(refPayload));
+
+                // 3. 发送 final_answer 事件（完整回答）
+                String fullAnswer = "这是完整的最终回答，包含所有内容。";
+                Map<String, String> finalData = Map.of("content", fullAnswer);
+                emitter.send(SseEmitter.event()
+                        .name("final_answer")
+                        .data(finalData));
+
+                // 完成流
+                emitter.complete();
+            } catch (Exception e) {
+                log.error("模拟 SSE 发送失败", e);
+                try {
+                    emitter.send(SseEmitter.event().name("error").data("模拟失败: " + e.getMessage()));
+                    emitter.completeWithError(e);
+                } catch (IOException ex) {
+                    log.error("发送错误事件失败", ex);
+                }
+            }
+        });
+
+        return emitter;
+    }
 }

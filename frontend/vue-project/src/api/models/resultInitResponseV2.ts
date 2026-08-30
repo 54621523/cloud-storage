@@ -4,15 +4,15 @@
  * OpenAPI definition
  * OpenAPI spec version: v0
  */
-import type { UploadProgress } from './uploadProgress';
+import type { InitResponseV2 } from './initResponseV2';
 
 /**
  * 通用响应对象
  */
-export interface ResultUploadProgress {
+export interface ResultInitResponseV2 {
   /** 响应状态码，1表示成功 */
   code?: number;
   /** 响应消息 */
   msg?: string;
-  data?: UploadProgress;
+  data: InitResponseV2;
 }

@@ -4,15 +4,16 @@
  * OpenAPI definition
  * OpenAPI spec version: v0
  */
-import type { UploadSession } from './uploadSession';
+import type { PartInfo } from './partInfo';
 
 /**
  * 通用响应对象
  */
-export interface ResultUploadSession {
+export interface ResultListPartInfo {
   /** 响应状态码，1表示成功 */
   code?: number;
   /** 响应消息 */
   msg?: string;
-  data?: UploadSession;
+  /** 响应数据 */
+  data: PartInfo[];
 }

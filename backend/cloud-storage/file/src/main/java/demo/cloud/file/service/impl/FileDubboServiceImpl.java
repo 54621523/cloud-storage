@@ -80,7 +80,7 @@ public class FileDubboServiceImpl implements FileDubboService {
      * @return
      */
     @Override
-    public String getOssKey(Long id) {
+    public String generateDownloadUrl(Long id) {
         MPJLambdaWrapper<UserFile> wrapper = new MPJLambdaWrapper<UserFile>()
                 .selectAs(UserFile::getName, "displayName")                // 选取 UserFile 的 name
                 .selectAs(FilePhysical::getOssKey, "ossKey")           // 选取 FilePhysical 的 ossKey

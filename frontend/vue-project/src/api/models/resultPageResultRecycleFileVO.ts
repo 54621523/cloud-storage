@@ -14,5 +14,5 @@ export interface ResultPageResultRecycleFileVO {
   code?: number;
   /** 响应消息 */
   msg?: string;
-  data?: PageResultRecycleFileVO;
+  data: PageResultRecycleFileVO;
 }

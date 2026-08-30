@@ -14,5 +14,5 @@ export interface ResultLoginResponse {
   code?: number;
   /** 响应消息 */
   msg?: string;
-  data?: LoginResponse;
+  data: LoginResponse;
 }

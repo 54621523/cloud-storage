@@ -15,5 +15,5 @@ export interface ResultListVirtualFileVO {
   /** 响应消息 */
   msg?: string;
   /** 响应数据 */
-  data?: VirtualFileVO[];
+  data: VirtualFileVO[];
 }

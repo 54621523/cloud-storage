@@ -36,7 +36,8 @@ import type {
   MoveRequest,
   RenameRequest,
   Result,
-  ResultListVirtualFileVO
+  ResultListVirtualFileVO,
+  Search1Params
 } from './models';
 
 import { customInstance } from '../utils/matutor/custom-instance';
@@ -242,7 +243,72 @@ export const useCreateFolder = <TError = unknown,
       > => {
       return useMutation(getCreateFolderMutationOptions(options), queryClient);
     }
-    /**
+    export const search1 = (
+    params: MaybeRefOrGetter<Search1Params>,
+ options?: SecondParameter<typeof customInstance>,signal?: AbortSignal
+) => {
+      params = toValue(params);
+
+      return customInstance<ResultListVirtualFileVO>(
+      {url: `/api/files/search`, method: 'GET',
+        params, signal
+    },
+      options);
+    }
+
+
+
+
+export const getSearch1QueryKey = (params?: MaybeRefOrGetter<Search1Params>,) => {
+    return [
+    'api','files','search', ...(params ? [params] : [])
+    ] as const;
+    }
+
+
+export const getSearch1QueryOptions = <TData = Awaited<ReturnType<typeof search1>>, TError = unknown>(params: MaybeRefOrGetter<Search1Params>, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof search1>>, TError, TData>>, request?: SecondParameter<typeof customInstance>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  getSearch1QueryKey(params);
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof search1>>> = ({ signal }) => search1(params, requestOptions, signal);
+
+
+
+
+
+   return  { queryKey, queryFn, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof search1>>, TError, TData>
+}
+
+export type Search1QueryResult = NonNullable<Awaited<ReturnType<typeof search1>>>
+export type Search1QueryError = unknown
+
+
+
+export function useSearch1<TData = Awaited<ReturnType<typeof search1>>, TError = unknown>(
+ params: MaybeRefOrGetter<Search1Params>, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof search1>>, TError, TData>>, request?: SecondParameter<typeof customInstance>}
+ , queryClient?: QueryClient
+ ): UseQueryReturnType<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> } {
+
+  const queryOptions = getSearch1QueryOptions(params,options)
+
+  const query = useQuery(queryOptions, queryClient) as UseQueryReturnType<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> };
+
+  query.queryKey = unref(queryOptions).queryKey as DataTag<QueryKey, TData, TError>;
+
+  return query;
+}
+
+
+
+
+
+
+/**
  * 根据父目录ID查询该目录下的子文件夹
  * @summary 仅获取文件夹列表
  */
@@ -387,7 +453,7 @@ export function useListFiles<TData = Awaited<ReturnType<typeof listFiles>>, TErr
 
 
 /**
- * 逻辑删除，将文件/文件夹移入回收站
+ * 将文件/文件夹移入回收站
  * @summary 批量移入回收站
  */
 export const moveToRecycleBin = (

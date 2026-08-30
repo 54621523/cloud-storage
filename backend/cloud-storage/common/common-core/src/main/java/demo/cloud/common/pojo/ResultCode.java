@@ -14,6 +14,9 @@ public enum ResultCode {
     SHARE_PASSWORD_ERROR(1003, "提取码错误"),
     SHARE_NOT_PERMISSION(1004, "无权访问该文件夹"),
     SHARE_INVALID_ITEM(1005, "没有有效文件"),
+    SHARE_PASSWORD_REQUIRED(400, "分享需要提取码"),
+    SHARE_INVALID_REQUEST(400, "请求参数错误"),
+    TOO_MANY_PASSWORD_ATTEMPTS(429, "密码尝试次数过多，请15分钟后重试"),
 
 
     UPLOAD_CANCELLED(2001, "上传已取消，无法合并"),

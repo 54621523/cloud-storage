@@ -2,12 +2,26 @@ package demo.cloud.file.service;
 
 import com.baomidou.mybatisplus.extension.service.IService;
 import demo.cloud.file.pojo.FilePhysical;
-import demo.cloud.file.pojo.UploadSession;
+
+import java.util.Collection;
 
 public interface FilePhysicalService extends IService<FilePhysical> {
-    FilePhysical getByMd5(String md5);
 
     void increaseRef(Long id);
 
-    FilePhysical processPhysicalFile(UploadSession session, String md5);
+    
+    void increaseRef(Collection<Long> id);
+
+    
+    void increaseRef(Long... id);
+
+
+    
+    void decreaseRef(Long id);
+
+    
+    void decreaseRef(Collection<Long> id);
+
+    
+    void decreaseRef(Long... id);
 }

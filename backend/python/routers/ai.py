@@ -8,14 +8,15 @@ from langchain_core.messages import HumanMessage
 from langchain_core.vectorstores import VectorStore
 from langgraph.checkpoint.base import BaseCheckpointSaver
 from typing import Annotated, Optional, List
-
+from structlog.contextvars import bind_contextvars, clear_contextvars
 from pydantic import BaseModel
 from RAG.core.llm_lifespan import get_llm
 from RAG.core.redis_lifespan import get_redis_checkpointer
 from RAG.core.vectorstore.MeilisearchVectorStore import get_vectorstore
 from langgraph.checkpoint.memory import InMemorySaver
 from RAG.RagAgent import build_agent_graph
-
+from RAG.Logging import logger
+import uuid
 router = APIRouter(tags=["Ai"])
 
 class ChatRequest(BaseModel):
@@ -41,13 +42,21 @@ async def chat_endpoint(
     vectorstore: Annotated[VectorStore, Depends(get_vectorstore)],
     checkpointer: Annotated[BaseCheckpointSaver, Depends(get_redis_checkpointer)],
 ):
-    use_mock = os.getenv("USE_MOCK_AI", "true").lower() == "true"
+    trace_id = str(uuid.uuid4())
+    session_id = request.session_id
+    bind_contextvars(
+        trace_id=trace_id,
+        session_id=session_id  # 也绑上，便于后续按会话筛选
+    )
+    try:
+        use_mock = os.getenv("USE_MOCK_AI", "true").lower() == "true"
     
-    if use_mock:
-        generator = mock_event_generator(request)
-    else:
-        generator = real_event_generator(request, llm, vectorstore, checkpointer)
-    
+        if use_mock:
+            generator = mock_event_generator(request)
+        else:
+            generator = real_event_generator(request, llm, vectorstore, checkpointer)
+    finally:
+        clear_contextvars()
     return StreamingResponse(generator, media_type="text/event-stream")
 
 async def real_event_generator(
@@ -109,6 +118,13 @@ async def real_event_generator(
         
         final_answer = final_state.values.get("final_answer")
         if final_answer:
+            logger.info(
+                "final_answer",
+                question=request.message,
+                answer=final_answer,
+                # 如果需要，可以记录所有检索到的chunks（从state中取）
+                all_retrieved_chunks=final_state.values.get("all_retrieved_chunks", [])
+    )
             yield format_sse(data={'content': final_answer}, event='final_answer')
 
     except Exception as e:

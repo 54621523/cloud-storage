@@ -18,6 +18,7 @@ export interface InitRequestV2 {
   /** 分块的大小（字节） */
   chunkSize?: number;
   parentId?: number;
+  relativePath?: string | null;
   totalChunks?: number;
   uploadId?: string;
 }

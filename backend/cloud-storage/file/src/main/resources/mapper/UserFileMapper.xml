@@ -31,4 +31,12 @@
             INNER JOIN file_physical fp ON uf.physical_id = fp.id
         WHERE uf.id = #{userFileId}
     </select>
+
+    <update id="batchRestoreFiles">
+        <foreach collection="list" item="item" separator=";">
+            UPDATE user_file
+            SET deleted_at = NULL, name = #{item.name}
+            WHERE id = #{item.id}
+        </foreach>
+    </update>
 </mapper>

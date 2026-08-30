@@ -15,6 +15,8 @@ public interface FileManagerService {
     // ====== Create ======
     void createFolder(CreateFolderRequest request, Long userId);
 
+    void addDocument(Long id);
+
 
     // ====== Read ======
     List<VirtualFileVO> getVirtualFileList(Long parentId, Long userId);
@@ -24,6 +26,8 @@ public interface FileManagerService {
     List<VirtualFileVO> getVirtualFileList(List<Long> fileIds, List<Long> folderIds );
 
     PageResult<RecycleFileVO> queryMyRecycleBin(Long pageNum, Long pageSize, Long userId);
+
+    List<VirtualFileVO> search(String keyword, Long userId);
 
     // ====== Update ======
 

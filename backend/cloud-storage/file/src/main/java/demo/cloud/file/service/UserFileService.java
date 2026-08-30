@@ -17,4 +17,5 @@ public interface UserFileService extends IService<UserFile>, MPJBaseService<User
     void saveFiles(List<UserFile> fileList, int batchSize);
 
 
+    List<UserFile> resolveNameConflicts(List<UserFile> moveFiles, Long userId, Long parentId);
 }

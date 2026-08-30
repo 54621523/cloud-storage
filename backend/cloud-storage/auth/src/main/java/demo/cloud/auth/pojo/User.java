@@ -4,6 +4,7 @@ import com.baomidou.mybatisplus.annotation.IdType;
 import com.baomidou.mybatisplus.annotation.TableId;
 import com.baomidou.mybatisplus.annotation.TableName;
 import com.fasterxml.jackson.annotation.JsonIgnore;
+import jakarta.validation.constraints.Email;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
 import lombok.Setter;
@@ -30,9 +31,20 @@ public class User implements UserDetails {
     @JsonIgnore
     private String password;
     // 邮箱
+    @Email
     private String email;
     // 手机号码
     private String phone;
+
+    private Long quotaTotal;
+
+    private Long quotaUsed;
+
+    private Integer version;
+
+    private Long rootFolderId;
+
+    private String rootFolderName;
 
 
     @Override

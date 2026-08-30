@@ -14,5 +14,5 @@ export interface ResultRegisterResponse {
   code?: number;
   /** 响应消息 */
   msg?: string;
-  data?: RegisterResponse;
+  data: RegisterResponse;
 }

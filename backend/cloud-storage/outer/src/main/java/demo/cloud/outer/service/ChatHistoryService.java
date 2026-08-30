@@ -93,6 +93,7 @@ public class ChatHistoryService {
      */
     @Transactional(rollbackFor = Exception.class)
     public void deleteSession(String sessionId, Long userId) {
+        // TODO 存在bug
         log.info("删除会话及其消息, sessionId: {}", sessionId);
         MPJLambdaWrapper<ChatSession> wrapper = JoinWrappers.lambda(ChatSession.class)
                 .leftJoin(ChatMessage.class, ChatMessage::getSessionId, ChatSession::getSessionId)

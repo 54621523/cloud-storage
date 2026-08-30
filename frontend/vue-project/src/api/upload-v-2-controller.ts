@@ -31,10 +31,11 @@ import type {
 import type {
   GenerateDownloadUrlParams,
   InitRequestV2,
-  InitResponseV2,
   ListPartsParams,
   MergeRequestV2,
-  PartInfo
+  ResultInitResponseV2,
+  ResultListPartInfo,
+  ResultString
 } from './models';
 
 import { customInstance } from '../utils/matutor/custom-instance';
@@ -51,7 +52,7 @@ export const completeMultipartUpload = (
 ) => {
       mergeRequestV2 = toValue(mergeRequestV2);
 
-      return customInstance<string>(
+      return customInstance<ResultString>(
       {url: `/api/v2/storage/merge`, method: 'POST',
       headers: {'Content-Type': 'application/json', },
       data: mergeRequestV2, signal
@@ -109,7 +110,7 @@ const {mutation: mutationOptions, request: requestOptions} = options ?
 ) => {
       initRequestV2 = toValue(initRequestV2);
 
-      return customInstance<InitResponseV2>(
+      return customInstance<ResultInitResponseV2>(
       {url: `/api/v2/storage/init`, method: 'POST',
       headers: {'Content-Type': 'application/json', },
       data: initRequestV2, signal
@@ -167,7 +168,7 @@ const {mutation: mutationOptions, request: requestOptions} = options ?
 ) => {
       params = toValue(params);
 
-      return customInstance<PartInfo[]>(
+      return customInstance<ResultListPartInfo>(
       {url: `/api/v2/storage/listParts`, method: 'GET',
         params, signal
     },
@@ -232,7 +233,7 @@ export const generateDownloadUrl = (
 ) => {
       params = toValue(params);
 
-      return customInstance<string>(
+      return customInstance<ResultString>(
       {url: `/api/v2/storage/Download`, method: 'GET',
         params, signal
     },

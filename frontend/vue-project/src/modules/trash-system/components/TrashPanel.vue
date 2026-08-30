@@ -112,9 +112,8 @@ const handleBatchRestore = async () => {
             '批量还原确认',
             { confirmButtonText: '确定', cancelButtonText: '取消', type: 'info' }
         );
-        // 并发执行还原
+        // 执行还原
         restoreFiles(selectedRows.value)
-        ElMessage.success(`成功还原 ${selectedRows.value.length} 项`);
         selectedRows.value = [];
         // 无需手动刷新，restoreFiles 内部会刷新列表
     } catch (err: any) {

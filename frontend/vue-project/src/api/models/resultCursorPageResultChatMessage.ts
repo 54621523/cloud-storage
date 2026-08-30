@@ -14,5 +14,5 @@ export interface ResultCursorPageResultChatMessage {
   code?: number;
   /** 响应消息 */
   msg?: string;
-  data?: CursorPageResultChatMessage;
+  data: CursorPageResultChatMessage;
 }

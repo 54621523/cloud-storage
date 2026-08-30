@@ -18,6 +18,7 @@ from langgraph.graph.message import add_messages
 from langgraph.checkpoint.redis import RedisSaver
 from redis import Redis
 from core import embeddings_model
+from RAG.Logging import logger
 
 # 引入 Meilisearch 官方客户端
 import meilisearch
@@ -37,10 +38,10 @@ try:
     # create_index 返回的是 TaskInfo，需要等待它执行完成
     task_info = client.create_index(INDEX_NAME, {'primaryKey': 'chunkId'})
     client.wait_for_task(task_info.task_uid)
-    print(f"索引 '{INDEX_NAME}' 创建成功。")
+    logger.info(f"索引 '{INDEX_NAME}' 创建成功。")
 except meilisearch.errors.MeilisearchApiError as e:
     if e.code == 'index_already_exists':
-        print(f"索引 '{INDEX_NAME}' 已存在，直接使用。")
+        logger.info(f"索引 '{INDEX_NAME}' 已存在，直接使用。")
     else:
         raise e
 
@@ -57,7 +58,7 @@ embedder_settings = {
 # 更新索引设置
 task_info = index.update_embedders(embedder_settings)
 client.wait_for_task(task_info.task_uid)
-print("Meilisearch 嵌入器配置成功。")
+logger.info("Meilisearch 嵌入器配置成功。")
 # --- 新增代码结束 ---
 
 llm = ChatOpenAI(model_name=model_name, api_key=api_key, base_url=base_url)
@@ -186,8 +187,8 @@ if __name__ == "__main__":
     
     for event in app.stream(inputs, config):
         for node_name, node_state in event.items():
-            print(f"--- 正在执行节点: {node_name} ---")
+            logger.info(f"--- 正在执行节点: {node_name} ---")
             if node_name == "generate":
-                print("AI 回答:", node_state["messages"][-1].content)
+                logger.info("AI 回答:", node_state["messages"][-1].content)
             elif node_name == "hallucination_check":
-                print("事实核查结果:", node_state["generation"])
+                logger.info("事实核查结果:", node_state["generation"])

@@ -14,7 +14,9 @@ import {
     useMoveToRecycleBin,
     useRename,
 } from '@/api/文件管理';
-import { generateDownloadUrl } from '@/api/upload-v-2-service'
+import { generateDownloadUrl } from '@/api/upload-v-2-controller'
+
+import { QUERY_KEYS } from '@/constants/queryKeys'
 
 // ============================================================
 // UI 状态管理
@@ -165,6 +167,7 @@ export function useFileExplorer(
         selection.clear(); // 删除后清空选中状态
         ElMessage.success(`成功删除 ${items.length} 项`);
         refresh();
+        queryClient.invalidateQueries({ queryKey: QUERY_KEYS.recycle });
     }
 
     async function downloadFilesV2(ids: number[]) {
@@ -176,7 +179,7 @@ export function useFileExplorer(
                 }
                 const result = await generateDownloadUrl(request);
                 if (result) {
-                    window.open(result, '_blank');
+                    window.open(result.data, '_blank');
                 } else {
                     ElMessage.error(`下载文件 ${id} 失败: '未知错误'}`);
                 }

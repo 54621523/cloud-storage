@@ -10,7 +10,7 @@
  */
 export interface LoginResponse {
   /** 登录token */
-  token?: string;
+  token: string;
   /** 昵称 */
   nickname?: string;
   username?: string;

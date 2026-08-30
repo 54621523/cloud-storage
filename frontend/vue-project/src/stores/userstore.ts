@@ -2,7 +2,7 @@ import { defineStore } from 'pinia';
 import { ref, computed } from 'vue';
 import request from '@/utils/request';
 import { ElMessage } from 'element-plus';
-import { STORAGE_KEYS } from '@/symbol';
+import { STORAGE_KEYS } from '@/constants/symbol';
 
 
 import { useLogin, useRegister } from '@/api/认证模块'

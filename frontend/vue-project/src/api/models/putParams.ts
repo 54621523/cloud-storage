@@ -5,10 +5,6 @@
  * OpenAPI spec version: v0
  */
 
-/**
- * 合并请求体
- */
-export interface MergeRequest {
-  /** 会话ID */
-  sessionId?: string;
-}
+export type PutParams = {
+id: number;
+};

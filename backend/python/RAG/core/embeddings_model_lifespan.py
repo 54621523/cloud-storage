@@ -3,6 +3,7 @@ from langchain_openai import OpenAIEmbeddings
 from dotenv import load_dotenv
 
 from .lifespan_manager import manager
+from RAG.Logging import logger
 
 load_dotenv()
 api_key = os.getenv("LLM_API_KEY")
@@ -21,7 +22,7 @@ async def get_embeddings_model():
         check_embedding_ctx_length=False,
     )
 
-    print("✅ 嵌入模型已初始化")
+    logger.info("✅ 嵌入模型已初始化")
     yield embeddings_model
     # 清理资源（如果有的话）
-    print("✅ 嵌入模型已清理")
+    logger.info("✅ 嵌入模型已清理")

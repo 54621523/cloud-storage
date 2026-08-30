@@ -8,42 +8,74 @@ import demo.cloud.common.exception.BusinessException;
 import demo.cloud.common.pojo.PageResult;
 import demo.cloud.file.constant.FileItemType;
 import demo.cloud.file.dto.*;
+import demo.cloud.file.pojo.FileDocument;
 import demo.cloud.file.pojo.UserFile;
 import demo.cloud.file.pojo.UserFolder;
 import demo.cloud.file.service.FileManagerService;
+import demo.cloud.file.service.FilePhysicalService;
 import demo.cloud.file.service.UserFileService;
 import demo.cloud.file.service.UserRecycleBinService;
+import demo.cloud.file.service.search.FileSearchRepository;
+import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
+import org.springframework.dao.DuplicateKeyException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDateTime;
-import java.util.ArrayList;
-import java.util.Collections;
-import java.util.Comparator;
-import java.util.List;
+import java.util.*;
+import java.util.stream.Collectors;
 
 @Service
+@Slf4j
+@RequiredArgsConstructor
 public class FileManagerServiceImpl implements FileManagerService {
 
     private final UserFileService userFileService;
     private final FolderService userFolderService;
     private final UserRecycleBinService userRecycleBinService;
+    private final FilePhysicalService filePhysicalService;
 
-
-    public FileManagerServiceImpl(UserFileService userFileService, FolderService FolderService, UserRecycleBinService userRecycleBinService) {
-        this.userFileService = userFileService;
-        this.userFolderService = FolderService;
-        this.userRecycleBinService = userRecycleBinService;
-    }
+    private final FileSearchRepository fileSearchRepository;
 
     // ====== Create ======
 
+    @Transactional
     @Override
     public void createFolder(CreateFolderRequest request, Long userId) {
-        if (!userFolderService.isOwner(request.getParentId(), userId)) {
-            throw new BusinessException(0,"无权访问该文件");
+        userFolderService.validateParent(userId, request.getParentId(), null);
+        UserFolder folder = new UserFolder();
+        folder.setParentId(request.getParentId());
+        folder.setName(request.getName());
+        folder.setUserId(userId);
+        try{
+        userFolderService.save(folder);
+        }catch (DuplicateKeyException e) {
+            throw new BusinessException(0, "该目录下已存在同名文件夹");
         }
-        userFolderService.getOrCreateFolder(userId, request.getParentId(), List.of(request.getName()));
+    }
+
+    /**
+     *
+     */
+    @Override
+    public void addDocument(Long id) {
+        UserFile one = userFileService.getOne(new LambdaQueryWrapper<UserFile>()
+                .eq(UserFile::getId, id)
+                .eq(UserFile::getUserId, 1L)
+                .last("Limit 1")
+        );
+        FileDocument userDocument = new FileDocument();
+        userDocument.setId(one.getId());
+        userDocument.setName(one.getName());
+        userDocument.setParentId(one.getParentId());
+        userDocument.setSize(one.getSize());
+        userDocument.setUserId(one.getUserId());
+        userDocument.setUpdateTime(one.getUpdateTime());
+        userDocument.setType(FileItemType.FILE);
+        userDocument.setStatus(0);
+        fileSearchRepository.addDocument(userDocument);
+
     }
 
     // ====== Read ======
@@ -90,18 +122,6 @@ public class FileManagerServiceImpl implements FileManagerService {
 
     @Override
     public List<VirtualFileVO> getVirtualFolderListOnly(Long parentId, Long userId) {
-        // 0. 获取用户根目录
-        if (parentId == null || parentId == 0L) {
-            UserFolder rootFolder = userFolderService.getOne(
-                    new LambdaQueryWrapper<UserFolder>()
-                            .eq(UserFolder::getUserId, userId)
-                            .eq(UserFolder::getParentId, 0L)
-            );
-            if (rootFolder == null) {
-                return new ArrayList<>();
-            }
-            parentId = rootFolder.getId();
-        }
         // 1.1. 构建文件夹查询条件
         LambdaQueryWrapper<UserFolder> folderWrapper = new LambdaQueryWrapper<UserFolder>()
                 .eq(UserFolder::getParentId, parentId)
@@ -147,53 +167,120 @@ public class FileManagerServiceImpl implements FileManagerService {
     }
 
 
+    @Override
+    public List<VirtualFileVO> search(String keyword, Long userId){
+        PageResult<FileDocument> pageResult = fileSearchRepository.searchFile(keyword, userId, null, null, null, null, 1, 10);
+        log.info("搜索引擎内数据为 {}", pageResult);
+        return null;
+    }
+
+
     // ====== Update ======
 
 
     @Override
+    @Transactional(rollbackFor = Exception.class)
     public void restore(RestoreRequest request, Long userId) {
-        // 1. 从request中分离出文件Id和文件夹Id
         ItemGroup group = ItemGroup.from(request.getItems());
-        // 2. 还原至文件系统
+
+        // 1. 处理文件恢复（存在同名则重命名）
         if (!group.fileIds().isEmpty()) {
-            userFileService.update(
-                    new LambdaUpdateWrapper<UserFile>()
-                            .eq(UserFile::getUserId, userId)
+            List<UserFile> files = userFileService.list(
+                    new LambdaQueryWrapper<UserFile>()
                             .in(UserFile::getId, group.fileIds())
-                            .set(UserFile::getDeletedAt, null)
+                            .eq(UserFile::getUserId, userId)
+                            .isNotNull(UserFile::getDeletedAt)
             );
+            if (files.size() != group.fileIds().size()) {
+                throw new BusinessException(0, "部分项目不存在或已被删除，请刷新后重试");
+            }
+
+            // 按原始父目录分组
+            Map<Long, List<UserFile>> fileGroupMap = files.stream()
+                    .collect(Collectors.groupingBy(UserFile::getParentId));
+
+            List<UserFile> resolvedFiles = new ArrayList<>();
+            for (Map.Entry<Long, List<UserFile>> entry : fileGroupMap.entrySet()) {
+                Long actualParentId = entry.getKey();
+                userFolderService.validateParent(userId, actualParentId, entry.getValue().get(0).getName());
+                resolvedFiles.addAll(
+                        userFileService.resolveNameConflicts(entry.getValue(), userId, actualParentId)
+                );
+            }
+
+            // 批量更新（清空 deleted_at + 更新 name）
+            for (UserFile file : resolvedFiles) {
+                file.setDeletedAt(null); // 清空删除标记
+            }
+            userFileService.updateBatchById(resolvedFiles); // 批量更新
         }
+
+        // 2. 处理文件夹恢复（存在同名则重命名）
         if (!group.folderIds().isEmpty()) {
-            userFolderService.update(
-                    new LambdaUpdateWrapper<UserFolder>()
-                            .eq(UserFolder::getUserId, userId)
+            List<UserFolder> folders = userFolderService.list(
+                    new LambdaQueryWrapper<UserFolder>()
                             .in(UserFolder::getId, group.folderIds())
-                            .set(UserFolder::getDeletedAt, null)
+                            .eq(UserFolder::getUserId, userId)
+                            .isNotNull(UserFolder::getDeletedAt)
             );
+            if (folders.size() != group.folderIds().size()) {
+                throw new BusinessException(0, "部分项目不存在或已被删除，请刷新后重试");
+            }
+            Map<Long, List<UserFolder>> folderGroupMap = folders.stream()
+                    .collect(Collectors.groupingBy(UserFolder::getParentId));
+
+            List<UserFolder> resolvedFolders = new ArrayList<>();
+            for (Map.Entry<Long, List<UserFolder>> entry : folderGroupMap.entrySet()) {
+                Long actualParentId = entry.getKey();
+                userFolderService.validateParent(userId, actualParentId, entry.getValue().get(0).getName());
+                resolvedFolders.addAll(
+                        userFolderService.resolveNameConflicts(entry.getValue(), userId, entry.getKey())
+                );
+            }
+            // 批量更新
+            for (UserFolder folder : resolvedFolders) {
+                folder.setDeletedAt(null);
+            }
+            userFolderService.updateBatchById(resolvedFolders);
         }
     }
 
 
     @Override
+    @Transactional(rollbackFor = Exception.class)
     public void rename(RenameRequest request, Long userId) {
         if (request.getType().equals(FileItemType.FILE)) {
-            userFileService.update(
-                    new LambdaUpdateWrapper<UserFile>()
-                            .eq(UserFile::getId, request.getId())
-                            .eq(UserFile::getUserId, userId)
-                            .isNull(UserFile::getDeletedAt)
-                            .set(UserFile::getName, request.getNewName())
-            );
+            try {
+                boolean updated =  userFileService.update(
+                        new LambdaUpdateWrapper<UserFile>()
+                                .eq(UserFile::getId, request.getId())
+                                .eq(UserFile::getUserId, userId)
+                                .isNull(UserFile::getDeletedAt)
+                                .set(UserFile::getName, request.getNewName())
+                );
+                if (!updated) {
+                    throw new BusinessException(0, "文件不存在或已被删除");
+                }
+            }catch (DuplicateKeyException e){
+                throw new BusinessException(0,"文件名已被占用");
+            }
             return;
         }
         if (request.getType().equals(FileItemType.FOLDER)) {
-            userFolderService.update(
-                    new LambdaUpdateWrapper<UserFolder>()
-                            .eq(UserFolder::getId, request.getId())
-                            .eq(UserFolder::getUserId, userId)
-                            .isNull(UserFolder::getDeletedAt)
-                            .set(UserFolder::getName, request.getNewName())
-            );
+            try{
+                boolean updated = userFolderService.update(
+                        new LambdaUpdateWrapper<UserFolder>()
+                                .eq(UserFolder::getId, request.getId())
+                                .eq(UserFolder::getUserId, userId)
+                                .isNull(UserFolder::getDeletedAt)
+                                .set(UserFolder::getName, request.getNewName())
+                );
+                if (!updated){
+                    throw new BusinessException(0, "文件不存在或已被删除");
+                }
+            }catch (DuplicateKeyException e){
+                throw new BusinessException(0,"文件夹名已被占用");
+            }
             return;
         }
 
@@ -201,43 +288,87 @@ public class FileManagerServiceImpl implements FileManagerService {
     }
 
     @Override
+    @Transactional(rollbackFor = Exception.class)
     public void moveTo(MoveRequest request, Long userId) {
+        userFolderService.validateParent(userId, request.getParentId(), null);
         // 1. 从request中分离出文件Id和文件夹Id
         ItemGroup group = ItemGroup.from(request.getItems());
-        // 1. 移动到目标文件夹下
+
+
         if (!group.fileIds().isEmpty()) {
-            userFileService.update(
-                    new LambdaUpdateWrapper<UserFile>()
-                            .eq(UserFile::getUserId, userId)
+            List<UserFile> moveFiles = userFileService.list(
+                    new LambdaQueryWrapper<UserFile>()
                             .in(UserFile::getId, group.fileIds())
+                            .eq(UserFile::getUserId, userId)
                             .isNull(UserFile::getDeletedAt)
-                            .set(UserFile::getParentId, request.getParentId())
             );
+            if (moveFiles.size() != group.fileIds().size()) {
+                throw new BusinessException(0, "部分项目不存在或已被删除，请刷新后重试");
+            }
+            moveFiles.forEach(file -> file.setParentId(request.getParentId()));
+            List<UserFile> files = userFileService.resolveNameConflicts(moveFiles, userId, request.getParentId());
+
+            userFileService.updateBatchById(files);
         }
         if (!group.folderIds().isEmpty()) {
-            userFolderService.update(
-                    new LambdaUpdateWrapper<UserFolder>()
-                            .eq(UserFolder::getUserId, userId)
+            List<UserFolder> moveFolders = userFolderService.list(
+                    new LambdaQueryWrapper<UserFolder>()
                             .in(UserFolder::getId, group.folderIds())
+                            .eq(UserFolder::getUserId, userId)
                             .isNull(UserFolder::getDeletedAt)
-                            .set(UserFolder::getParentId, request.getParentId())
             );
+            if (moveFolders.size() != group.folderIds().size()) {
+                throw new BusinessException(0, "部分项目不存在或已被删除，请刷新后重试");
+            }
+            if (group.folderIds().contains(request.getParentId())
+                    ||
+                    userFolderService.getBaseMapper().getFolderChildren(group.folderIds(), userId).contains(request.getParentId())
+                ) {
+                throw new BusinessException(0, "不能将文件夹移动到自身或其子文件夹");
+            }
+            moveFolders.forEach(folder -> folder.setParentId(request.getParentId()));
+            List<UserFolder> folders = userFolderService.resolveNameConflicts(moveFolders, userId, request.getParentId());
+
+            userFolderService.updateBatchById(folders);
         }
     }
+
     // ====== Delete ======
     @Override
+    @Transactional
     public void deletePermanently(DeleteRequest request, Long userId) {
-        // 1. 从request中分离出文件Id和文件夹Id
         ItemGroup group = ItemGroup.from(request.getItems());
-        // 2. 执行彻底删除
+
+        // 1. 处理文件删除及物理文件引用减少
         if (!group.fileIds().isEmpty()) {
-            userFileService.remove(
+            // 查询待删除的 UserFile 记录（包含 fileId 字段）
+            List<UserFile> userFiles = userFileService.list(
                     new LambdaQueryWrapper<UserFile>()
                             .eq(UserFile::getUserId, userId)
                             .in(UserFile::getId, group.fileIds())
                             .isNotNull(UserFile::getDeletedAt)
             );
+            if (!userFiles.isEmpty()) {
+                // 收集所有物理文件 ID（去重）
+                Set<Long> physicalFileIds = userFiles.stream()
+                        .map(UserFile::getPhysicalId)
+                        .filter(Objects::nonNull)
+                        .collect(Collectors.toSet());
+
+                // 减少每个物理文件的引用计数（若引用归零则物理删除）
+                filePhysicalService.decreaseRef(physicalFileIds);
+
+                // 删除 UserFile 记录
+                userFileService.remove(
+                        new LambdaQueryWrapper<UserFile>()
+                                .eq(UserFile::getUserId, userId)
+                                .in(UserFile::getId, group.fileIds())
+                                .isNotNull(UserFile::getDeletedAt)
+                );
+            }
         }
+
+        // 2. 处理文件夹删除（文件夹本身不关联物理文件，暂无需额外操作）
         if (!group.folderIds().isEmpty()) {
             userFolderService.remove(
                     new LambdaQueryWrapper<UserFolder>()
@@ -249,16 +380,15 @@ public class FileManagerServiceImpl implements FileManagerService {
     }
 
     @Override
-    @Transactional(rollbackFor = Exception.class)
+    @Transactional
     public void moveToRecycleBin(DeleteRequest request, Long userId) {
-        // 1. 从request中分离出文件Id和文件夹Id
         ItemGroup group = ItemGroup.from(request.getItems());
-        // 2. 移动至回收站
         if (!group.fileIds().isEmpty()) {
             userFileService.update(
                     new LambdaUpdateWrapper<UserFile>()
                             .eq(UserFile::getUserId, userId)
                             .in(UserFile::getId, group.fileIds())
+                            .isNull(UserFile::getDeletedAt)
                             .set(UserFile::getDeletedAt, LocalDateTime.now())
             );
         }
@@ -267,7 +397,9 @@ public class FileManagerServiceImpl implements FileManagerService {
                     new LambdaUpdateWrapper<UserFolder>()
                             .eq(UserFolder::getUserId, userId)
                             .in(UserFolder::getId, group.folderIds())
-                            .set(UserFolder::getDeletedAt, LocalDateTime.now()));
+                            .isNull(UserFolder::getDeletedAt)
+                            .set(UserFolder::getDeletedAt, LocalDateTime.now())
+            );
         }
     }
 

@@ -11,7 +11,7 @@ public interface FileDubboService {
 
     FilePhysicalDTO getPhysicalFileByUserIdAndUserFileId(Long userFileId, Long userId);
 
-    String getOssKey(Long id);
+    String generateDownloadUrl(Long id);
 
     List<Long> getAllowedDocIdsByUserId(Long userId);
 

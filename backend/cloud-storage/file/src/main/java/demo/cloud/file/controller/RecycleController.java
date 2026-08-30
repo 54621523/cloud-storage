@@ -53,7 +53,7 @@ public class RecycleController {
     @Operation(summary = "还原文件/文件夹", description = "还原文件或文件夹")
     public Result restore(@RequestBody RestoreRequest request){
         Long userId = BaseContext.getUserId();
-        log.info("用户{} 还原文件",userId);
+        log.info("用户{} 还原文件数量 {} ",userId, request.getItems().size());
         fileManagerService.restore(request, userId);
         return Result.success();
     }

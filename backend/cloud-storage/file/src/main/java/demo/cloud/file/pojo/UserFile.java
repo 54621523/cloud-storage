@@ -69,6 +69,7 @@ public class UserFile implements Serializable {
     /**
      * 逻辑删除时间
      */
+    @TableField(updateStrategy = FieldStrategy.ALWAYS)
     private LocalDateTime deletedAt;
 
     /**

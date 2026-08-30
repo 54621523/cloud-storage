@@ -12,6 +12,8 @@ import {
 } from '@/api/回收站管理';
 import type { ListRecycleBinFilesParams } from '@/api/models';
 
+import { QUERY_KEYS } from '@/constants/queryKeys'
+
 export function useTrash() {
     const queryClient = useQueryClient();
 
@@ -102,6 +104,7 @@ export function useTrash() {
         selection.clear();
         ElMessage.success(`成功还原 ${items.length} 项`);
         refresh();
+        queryClient.invalidateQueries({ queryKey: QUERY_KEYS.files });
     }
 
     // ---------- 彻底删除 ----------
@@ -126,7 +129,6 @@ export function useTrash() {
         const identities = items.map(item => ({ id: item.id, type: item.type }));
         await deletePermanentlyMutation.mutateAsync({ data: { items: identities } });
         selection.clear();
-        ElMessage.success(`成功彻底删除 ${items.length} 项`);
         refresh();
     }
 

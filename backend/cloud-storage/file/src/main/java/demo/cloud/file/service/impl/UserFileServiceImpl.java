@@ -83,27 +83,10 @@ public class UserFileServiceImpl extends ServiceImpl<UserFileMapper, UserFile> i
                     throw new RuntimeException("系统繁忙，请稍后重试");
                 }
 
-            // 2.1 查询该组（该文件夹）下所有活跃的文件名（只查 name 列，高效）
-                Set<String> existingNames = userFileMapper.selectList(
-                        new LambdaQueryWrapper<UserFile>()
-                                .eq(UserFile::getUserId, userId)
-                                .eq(UserFile::getParentId, parentId)
-                                .isNull(UserFile::getDeletedAt)
-                                .select(UserFile::getName)
-                ).stream().map(UserFile::getName).collect(Collectors.toSet());
-
-            // 2.2 该组内内存重命名（处理与该文件夹已有文件的重名，以及组内自身的重名）
-                for (UserFile file : groupFiles) {
-                    String originalName = file.getName();
-                    while (existingNames.contains(originalName)) {
-                        originalName = generateUniqueName(originalName);
-                    }
-                    file.setName(originalName);
-                    existingNames.add(originalName); // 防止组内同名
-                }
+                List<UserFile> resolvedFiles = resolveNameConflicts(groupFiles, userId, parentId);
 
             // 3. 批量插入
-            userFileMapper.insert(groupFiles, batchSize);
+            userFileMapper.insert(resolvedFiles, batchSize);
             }
             catch (InterruptedException e) {
                 Thread.currentThread().interrupt();
@@ -136,5 +119,30 @@ public class UserFileServiceImpl extends ServiceImpl<UserFileMapper, UserFile> i
         String timestamp = LocalDateTime.now().format(DateTimeFormatter.ofPattern("yyyyMMdd_HHmmss_SSS"));
         String random = UUID.randomUUID().toString().substring(0, 4);
         return baseName + "_" + timestamp + "_" + random + extension;
+    }
+
+
+
+    public List<UserFile> resolveNameConflicts(List<UserFile> targetFiles, Long userId, Long parentId) {
+        // 1. 查询目标文件夹现有的所有名称
+        Set<String> existingNames = userFileMapper.selectList(
+                new LambdaQueryWrapper<UserFile>()
+                        .eq(UserFile::getUserId, userId)
+                        .eq(UserFile::getParentId, parentId)
+                        .isNull(UserFile::getDeletedAt)
+                        .select(UserFile::getName)
+        ).stream().map(UserFile::getName).collect(Collectors.toSet());
+
+        // 2. 重命名循环
+        List<UserFile> resolvedList = new ArrayList<>(targetFiles);
+        for (UserFile file : resolvedList) {
+            String originalName = file.getName();
+            while (existingNames.contains(originalName)) {
+                originalName = generateUniqueName(originalName); // 复用你已有的方法
+            }
+            file.setName(originalName);
+            existingNames.add(originalName);
+        }
+        return resolvedList;
     }
 }

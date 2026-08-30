@@ -14,5 +14,5 @@ export interface ResultCreateShareResponse {
   code?: number;
   /** 响应消息 */
   msg?: string;
-  data?: CreateShareResponse;
+  data: CreateShareResponse;
 }

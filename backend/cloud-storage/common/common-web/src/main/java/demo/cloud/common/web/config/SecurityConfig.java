@@ -3,6 +3,7 @@ package demo.cloud.common.web.config;
 import demo.cloud.common.web.filter.UserContextFilter;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
+import org.springframework.core.annotation.Order;
 import org.springframework.security.config.annotation.method.configuration.EnableMethodSecurity;
 import org.springframework.security.config.annotation.web.builders.HttpSecurity;
 import org.springframework.security.config.annotation.web.configurers.AbstractHttpConfigurer;
@@ -17,6 +18,7 @@ public class SecurityConfig {
 
 
     @Bean
+    @Order(1)
     public SecurityFilterChain filterChain(HttpSecurity http) throws Exception {
         http
                 // 禁用 CSRF（JWT 无状态架构下必须禁用）
@@ -26,7 +28,7 @@ public class SecurityConfig {
                 // 接口权限控制
                 .authorizeHttpRequests(authz -> authz
                         // 放行登录、注册、验证 Token 和监控接口
-                        .requestMatchers("/api/ai/stream/chat", "/api/actuator/**",
+                        .requestMatchers("/api/actuator/**",
                                 "/v3/api-docs/**",       // 核心文档数据接口（非常重要）
                                 "/swagger-ui/**",        // UI 静态页面资源
                                 "/swagger-ui.html",      // UI 访问入口

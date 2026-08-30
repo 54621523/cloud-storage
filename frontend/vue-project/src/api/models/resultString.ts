@@ -14,5 +14,5 @@ export interface ResultString {
   /** 响应消息 */
   msg?: string;
   /** 响应数据 */
-  data?: string;
+  data: string;
 }

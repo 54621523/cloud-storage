@@ -56,6 +56,14 @@ public class FileController {
         return Result.success(virtualFileList);
     }
 
+    @GetMapping("/search")
+    public Result<List<VirtualFileVO>> search(String searchName){
+        Long userId = BaseContext.getUserId();
+
+        fileManagerService.search(searchName, userId);
+        return Result.success();
+    }
+
     // ==================== 2. 创建接口 ====================
 
     /**

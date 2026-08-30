@@ -12,7 +12,7 @@ from langchain_core.vectorstores import VectorStore
 
 from ..lifespan_manager import manager
 from ..embeddings_model_lifespan import get_embeddings_model
-
+from RAG.Logging import logger
 load_dotenv()
 
 
@@ -256,13 +256,13 @@ class CustomMeilisearch(VectorStore):
 
 @manager.register
 async def get_meilisearch_client():
-    print("正在初始化 meilisearch 客户端")
+    logger.info("正在初始化 meilisearch 客户端")
     client = meilisearch.Client(
         url=os.getenv("MEILISEARCH_URL", "localhost:7700"),
         api_key=os.getenv("MEILISEARCH_API_KEY", "oEkwo3F1GozGwD7lkeDevr_PMMNx5fgku1W1XOwDlW4")
     )
     yield client
-    print("关闭 meilisearch")
+    logger.info("关闭 meilisearch")
 
 
 @manager.register
@@ -302,7 +302,7 @@ async def get_vectorstore(
         index = meilisearch_client.index(index_name)
         index.update_embedders(embedders)
     except Exception as e:
-        print(f"更新 Meilisearch embedders 设置时出错（可能已存在）: {e}")
+        logger.info(f"更新 Meilisearch embedders 设置时出错（可能已存在）: {e}")
 
     # 实例化自定义的 VectorStore
     vector_store = CustomMeilisearch(

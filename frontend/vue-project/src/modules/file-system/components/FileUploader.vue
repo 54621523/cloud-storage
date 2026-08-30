@@ -30,9 +30,9 @@ import { ElMessage } from 'element-plus'
 const UPLOADER_NAME = 'myUploader'
 
 import { FileUD, type Uploader, type UploadFile } from '@file-ud.js/core'
-import { initUpload, completeMultipartUpload } from '@/api/upload-v-2-service'
+import { initUpload, completeMultipartUpload } from '@/api/upload-v-2-controller'
 import { tr } from 'element-plus/es/locales.mjs';
-import { FILE_EXPLORER_KEY } from '@/symbol';
+import { FILE_EXPLORER_KEY } from '@/constants/symbol';
 
 const fileContext = inject(FILE_EXPLORER_KEY)
 if (!fileContext) throw new Error('fileExplorer not provided');
@@ -209,7 +209,8 @@ onMounted(() => {
 
     try {
       const res = await initUpload(request)
-      const data = res as any // 根据实际 API 响应定义更具体的类型
+      const data = res.data
+      console.log(data)
 
       if (data.isComplete) {
         refresh()
@@ -220,19 +221,18 @@ onMounted(() => {
         }
       }
 
-
       const metadata = (file.metadata || {})
       metadata.uploadId = data.uploadId
       metadata.uploadedChunks = new Set(data.uploadedChunks || [])
       const allChunks = Array.from({ length: totalChunks }, (_, i) => i + 1)
       const missingChunks = allChunks.filter((n) => !metadata.uploadedChunks!.has(n))
 
-      if (missingChunks.length !== data.presignedUrls.length) {
+      if (missingChunks.length !== data.presignedUrls!.length) {
         throw new Error('预签名 URL 数量与未上传分片数量不匹配')
       }
 
       const chunkUrlMap = new Map<number, string>()
-      data.presignedUrls.forEach((url: string, idx: number) => {
+      data.presignedUrls!.forEach((url: string, idx: number) => {
         chunkUrlMap.set(missingChunks[idx]!, url)
       })
       metadata.chunkUrlMap = chunkUrlMap
@@ -250,6 +250,7 @@ onMounted(() => {
       }
     } catch (error) {
       const err = error as Error
+      console.log(err)
       throw error
     }
   }

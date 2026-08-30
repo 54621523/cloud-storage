@@ -53,308 +53,299 @@ type SecondParameter<T extends (...args: never) => unknown> = Parameters<T>[1];
 
 export const updateSharedFile = (
 
-  options?: SecondParameter<typeof customInstance>, signal?: AbortSignal
+ options?: SecondParameter<typeof customInstance>,signal?: AbortSignal
 ) => {
 
 
-  return customInstance<Result>(
-    {
-      url: `/api/shares/update`, method: 'PUT', signal
+      return customInstance<Result>(
+      {url: `/api/shares/update`, method: 'PUT', signal
     },
-    options);
-}
+      options);
+    }
 
 
 
 
 export const getUpdateSharedFileMutationOptions = <TError = unknown,
-  TContext = unknown>(options?: { mutation?: UseMutationOptions<Awaited<ReturnType<typeof updateSharedFile>>, TError, void, TContext>, request?: SecondParameter<typeof customInstance> }
-  ): UseMutationOptions<Awaited<ReturnType<typeof updateSharedFile>>, TError, void, TContext> => {
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof updateSharedFile>>, TError,void, TContext>, request?: SecondParameter<typeof customInstance>}
+): UseMutationOptions<Awaited<ReturnType<typeof updateSharedFile>>, TError,void, TContext> => {
 
-  const mutationKey = ['updateSharedFile'];
-  const { mutation: mutationOptions, request: requestOptions } = options ?
-    options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+const mutationKey = ['updateSharedFile'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
       options
-      : { ...options, mutation: { ...options.mutation, mutationKey } }
-    : { mutation: { mutationKey, }, request: undefined };
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
 
 
 
 
-  const mutationFn: MutationFunction<Awaited<ReturnType<typeof updateSharedFile>>, void> = () => {
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof updateSharedFile>>, void> = () => {
 
 
-    return updateSharedFile(requestOptions)
-  }
-
-
-
+          return  updateSharedFile(requestOptions)
+        }
 
 
 
-  return { mutationFn, ...mutationOptions }
-}
 
-export type UpdateSharedFileMutationResult = NonNullable<Awaited<ReturnType<typeof updateSharedFile>>>
 
-export type UpdateSharedFileMutationError = unknown
 
-export const useUpdateSharedFile = <TError = unknown,
-  TContext = unknown>(options?: { mutation?: UseMutationOptions<Awaited<ReturnType<typeof updateSharedFile>>, TError, void, TContext>, request?: SecondParameter<typeof customInstance> }
-    , queryClient?: QueryClient): UseMutationReturnType<
-      Awaited<ReturnType<typeof updateSharedFile>>,
-      TError,
-      void,
-      TContext
-    > => {
-  return useMutation(getUpdateSharedFileMutationOptions(options), queryClient);
-}
-/**
-* 使用提取码访问分享链接
-* @summary 访问分享链接
-*/
+  return  { mutationFn, ...mutationOptions }}
+
+    export type UpdateSharedFileMutationResult = NonNullable<Awaited<ReturnType<typeof updateSharedFile>>>
+
+    export type UpdateSharedFileMutationError = unknown
+
+    export const useUpdateSharedFile = <TError = unknown,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof updateSharedFile>>, TError,void, TContext>, request?: SecondParameter<typeof customInstance>}
+ , queryClient?: QueryClient): UseMutationReturnType<
+        Awaited<ReturnType<typeof updateSharedFile>>,
+        TError,
+        void,
+        TContext
+      > => {
+      return useMutation(getUpdateSharedFileMutationOptions(options), queryClient);
+    }
+    /**
+ * 使用提取码访问分享链接
+ * @summary 访问分享链接
+ */
 export const verifySharedFile = (
-  shareCode: MaybeRefOrGetter<string>,
-  params?: MaybeRefOrGetter<VerifySharedFileParams>,
-  options?: SecondParameter<typeof customInstance>, signal?: AbortSignal
+    shareCode: MaybeRefOrGetter<string>,
+    params?: MaybeRefOrGetter<VerifySharedFileParams>,
+ options?: SecondParameter<typeof customInstance>,signal?: AbortSignal
 ) => {
-  shareCode = toValue(shareCode);
-  params = toValue(params);
+      shareCode = toValue(shareCode);
+params = toValue(params);
 
-  return customInstance<ResultString>(
-    {
-      url: `/api/shares/verify/${shareCode}`, method: 'POST',
-      params, signal
+      return customInstance<ResultString>(
+      {url: `/api/shares/verify/${shareCode}`, method: 'POST',
+        params, signal
     },
-    options);
-}
+      options);
+    }
 
 
 
 
 export const getVerifySharedFileMutationOptions = <TError = unknown,
-  TContext = unknown>(options?: { mutation?: UseMutationOptions<Awaited<ReturnType<typeof verifySharedFile>>, TError, { shareCode: string; params?: VerifySharedFileParams }, TContext>, request?: SecondParameter<typeof customInstance> }
-  ): UseMutationOptions<Awaited<ReturnType<typeof verifySharedFile>>, TError, { shareCode: string; params?: VerifySharedFileParams }, TContext> => {
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof verifySharedFile>>, TError,{shareCode: string;params?: VerifySharedFileParams}, TContext>, request?: SecondParameter<typeof customInstance>}
+): UseMutationOptions<Awaited<ReturnType<typeof verifySharedFile>>, TError,{shareCode: string;params?: VerifySharedFileParams}, TContext> => {
 
-  const mutationKey = ['verifySharedFile'];
-  const { mutation: mutationOptions, request: requestOptions } = options ?
-    options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+const mutationKey = ['verifySharedFile'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
       options
-      : { ...options, mutation: { ...options.mutation, mutationKey } }
-    : { mutation: { mutationKey, }, request: undefined };
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
 
 
 
 
-  const mutationFn: MutationFunction<Awaited<ReturnType<typeof verifySharedFile>>, { shareCode: string; params?: VerifySharedFileParams }> = (props) => {
-    const { shareCode, params } = props ?? {};
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof verifySharedFile>>, {shareCode: string;params?: VerifySharedFileParams}> = (props) => {
+          const {shareCode,params} = props ?? {};
 
-    return verifySharedFile(shareCode, params, requestOptions)
-  }
-
-
+          return  verifySharedFile(shareCode,params,requestOptions)
+        }
 
 
 
 
-  return { mutationFn, ...mutationOptions }
-}
 
-export type VerifySharedFileMutationResult = NonNullable<Awaited<ReturnType<typeof verifySharedFile>>>
 
-export type VerifySharedFileMutationError = unknown
+  return  { mutationFn, ...mutationOptions }}
 
-/**
-* @summary 访问分享链接
-*/
+    export type VerifySharedFileMutationResult = NonNullable<Awaited<ReturnType<typeof verifySharedFile>>>
+
+    export type VerifySharedFileMutationError = unknown
+
+    /**
+ * @summary 访问分享链接
+ */
 export const useVerifySharedFile = <TError = unknown,
-  TContext = unknown>(options?: { mutation?: UseMutationOptions<Awaited<ReturnType<typeof verifySharedFile>>, TError, { shareCode: string; params?: VerifySharedFileParams }, TContext>, request?: SecondParameter<typeof customInstance> }
-    , queryClient?: QueryClient): UseMutationReturnType<
-      Awaited<ReturnType<typeof verifySharedFile>>,
-      TError,
-      { shareCode: string; params?: VerifySharedFileParams },
-      TContext
-    > => {
-  return useMutation(getVerifySharedFileMutationOptions(options), queryClient);
-}
-/**
-* 根据请求体创建分享链接
-* @summary 创建分享链接
-*/
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof verifySharedFile>>, TError,{shareCode: string;params?: VerifySharedFileParams}, TContext>, request?: SecondParameter<typeof customInstance>}
+ , queryClient?: QueryClient): UseMutationReturnType<
+        Awaited<ReturnType<typeof verifySharedFile>>,
+        TError,
+        {shareCode: string;params?: VerifySharedFileParams},
+        TContext
+      > => {
+      return useMutation(getVerifySharedFileMutationOptions(options), queryClient);
+    }
+    /**
+ * 根据请求体创建分享链接
+ * @summary 创建分享链接
+ */
 export const shareFile = (
-  createShareRequest: MaybeRefOrGetter<CreateShareRequest>,
-  options?: SecondParameter<typeof customInstance>, signal?: AbortSignal
+    createShareRequest: MaybeRefOrGetter<CreateShareRequest>,
+ options?: SecondParameter<typeof customInstance>,signal?: AbortSignal
 ) => {
-  createShareRequest = toValue(createShareRequest);
+      createShareRequest = toValue(createShareRequest);
 
-  return customInstance<ResultCreateShareResponse>(
-    {
-      url: `/api/shares/share`, method: 'POST',
-      headers: { 'Content-Type': 'application/json', },
+      return customInstance<ResultCreateShareResponse>(
+      {url: `/api/shares/share`, method: 'POST',
+      headers: {'Content-Type': 'application/json', },
       data: createShareRequest, signal
     },
-    options);
-}
+      options);
+    }
 
 
 
 
 export const getShareFileMutationOptions = <TError = unknown,
-  TContext = unknown>(options?: { mutation?: UseMutationOptions<Awaited<ReturnType<typeof shareFile>>, TError, { data: CreateShareRequest }, TContext>, request?: SecondParameter<typeof customInstance> }
-  ): UseMutationOptions<Awaited<ReturnType<typeof shareFile>>, TError, { data: CreateShareRequest }, TContext> => {
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof shareFile>>, TError,{data: CreateShareRequest}, TContext>, request?: SecondParameter<typeof customInstance>}
+): UseMutationOptions<Awaited<ReturnType<typeof shareFile>>, TError,{data: CreateShareRequest}, TContext> => {
 
-  const mutationKey = ['shareFile'];
-  const { mutation: mutationOptions, request: requestOptions } = options ?
-    options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+const mutationKey = ['shareFile'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
       options
-      : { ...options, mutation: { ...options.mutation, mutationKey } }
-    : { mutation: { mutationKey, }, request: undefined };
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
 
 
 
 
-  const mutationFn: MutationFunction<Awaited<ReturnType<typeof shareFile>>, { data: CreateShareRequest }> = (props) => {
-    const { data } = props ?? {};
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof shareFile>>, {data: CreateShareRequest}> = (props) => {
+          const {data} = props ?? {};
 
-    return shareFile(data, requestOptions)
-  }
-
-
+          return  shareFile(data,requestOptions)
+        }
 
 
 
 
-  return { mutationFn, ...mutationOptions }
-}
 
-export type ShareFileMutationResult = NonNullable<Awaited<ReturnType<typeof shareFile>>>
-export type ShareFileMutationBody = CreateShareRequest
-export type ShareFileMutationError = unknown
 
-/**
-* @summary 创建分享链接
-*/
+  return  { mutationFn, ...mutationOptions }}
+
+    export type ShareFileMutationResult = NonNullable<Awaited<ReturnType<typeof shareFile>>>
+    export type ShareFileMutationBody = CreateShareRequest
+    export type ShareFileMutationError = unknown
+
+    /**
+ * @summary 创建分享链接
+ */
 export const useShareFile = <TError = unknown,
-  TContext = unknown>(options?: { mutation?: UseMutationOptions<Awaited<ReturnType<typeof shareFile>>, TError, { data: CreateShareRequest }, TContext>, request?: SecondParameter<typeof customInstance> }
-    , queryClient?: QueryClient): UseMutationReturnType<
-      Awaited<ReturnType<typeof shareFile>>,
-      TError,
-      { data: CreateShareRequest },
-      TContext
-    > => {
-  return useMutation(getShareFileMutationOptions(options), queryClient);
-}
-/**
-* 访问者将文件转存到自己的网盘中，需要指定目标文件夹
-* @summary 转存文件
-*/
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof shareFile>>, TError,{data: CreateShareRequest}, TContext>, request?: SecondParameter<typeof customInstance>}
+ , queryClient?: QueryClient): UseMutationReturnType<
+        Awaited<ReturnType<typeof shareFile>>,
+        TError,
+        {data: CreateShareRequest},
+        TContext
+      > => {
+      return useMutation(getShareFileMutationOptions(options), queryClient);
+    }
+    /**
+ * 访问者将文件转存到自己的网盘中，需要指定目标文件夹
+ * @summary 转存文件
+ */
 export const saveSharedFile = (
-  transferRequest: MaybeRefOrGetter<TransferRequest>,
-  options?: SecondParameter<typeof customInstance>, signal?: AbortSignal
+    transferRequest: MaybeRefOrGetter<TransferRequest>,
+ options?: SecondParameter<typeof customInstance>,signal?: AbortSignal
 ) => {
-  transferRequest = toValue(transferRequest);
+      transferRequest = toValue(transferRequest);
 
-  return customInstance<Result>(
-    {
-      url: `/api/shares/save`, method: 'POST',
-      headers: { 'Content-Type': 'application/json', },
+      return customInstance<Result>(
+      {url: `/api/shares/save`, method: 'POST',
+      headers: {'Content-Type': 'application/json', },
       data: transferRequest, signal
     },
-    options);
-}
+      options);
+    }
 
 
 
 
 export const getSaveSharedFileMutationOptions = <TError = unknown,
-  TContext = unknown>(options?: { mutation?: UseMutationOptions<Awaited<ReturnType<typeof saveSharedFile>>, TError, { data: TransferRequest }, TContext>, request?: SecondParameter<typeof customInstance> }
-  ): UseMutationOptions<Awaited<ReturnType<typeof saveSharedFile>>, TError, { data: TransferRequest }, TContext> => {
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof saveSharedFile>>, TError,{data: TransferRequest}, TContext>, request?: SecondParameter<typeof customInstance>}
+): UseMutationOptions<Awaited<ReturnType<typeof saveSharedFile>>, TError,{data: TransferRequest}, TContext> => {
 
-  const mutationKey = ['saveSharedFile'];
-  const { mutation: mutationOptions, request: requestOptions } = options ?
-    options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+const mutationKey = ['saveSharedFile'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
       options
-      : { ...options, mutation: { ...options.mutation, mutationKey } }
-    : { mutation: { mutationKey, }, request: undefined };
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
 
 
 
 
-  const mutationFn: MutationFunction<Awaited<ReturnType<typeof saveSharedFile>>, { data: TransferRequest }> = (props) => {
-    const { data } = props ?? {};
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof saveSharedFile>>, {data: TransferRequest}> = (props) => {
+          const {data} = props ?? {};
 
-    return saveSharedFile(data, requestOptions)
-  }
-
-
+          return  saveSharedFile(data,requestOptions)
+        }
 
 
 
 
-  return { mutationFn, ...mutationOptions }
-}
 
-export type SaveSharedFileMutationResult = NonNullable<Awaited<ReturnType<typeof saveSharedFile>>>
-export type SaveSharedFileMutationBody = TransferRequest
-export type SaveSharedFileMutationError = unknown
 
-/**
-* @summary 转存文件
-*/
+  return  { mutationFn, ...mutationOptions }}
+
+    export type SaveSharedFileMutationResult = NonNullable<Awaited<ReturnType<typeof saveSharedFile>>>
+    export type SaveSharedFileMutationBody = TransferRequest
+    export type SaveSharedFileMutationError = unknown
+
+    /**
+ * @summary 转存文件
+ */
 export const useSaveSharedFile = <TError = unknown,
-  TContext = unknown>(options?: { mutation?: UseMutationOptions<Awaited<ReturnType<typeof saveSharedFile>>, TError, { data: TransferRequest }, TContext>, request?: SecondParameter<typeof customInstance> }
-    , queryClient?: QueryClient): UseMutationReturnType<
-      Awaited<ReturnType<typeof saveSharedFile>>,
-      TError,
-      { data: TransferRequest },
-      TContext
-    > => {
-  return useMutation(getSaveSharedFileMutationOptions(options), queryClient);
-}
-/**
-* 查询属于自己的分享链接列表
-* @summary 查询分享文件列表
-*/
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof saveSharedFile>>, TError,{data: TransferRequest}, TContext>, request?: SecondParameter<typeof customInstance>}
+ , queryClient?: QueryClient): UseMutationReturnType<
+        Awaited<ReturnType<typeof saveSharedFile>>,
+        TError,
+        {data: TransferRequest},
+        TContext
+      > => {
+      return useMutation(getSaveSharedFileMutationOptions(options), queryClient);
+    }
+    /**
+ * 查询属于自己的分享链接列表
+ * @summary 查询分享文件列表
+ */
 export const listSharedFile = (
-  params: MaybeRefOrGetter<ListSharedFileParams>,
-  options?: SecondParameter<typeof customInstance>, signal?: AbortSignal
+    params: MaybeRefOrGetter<ListSharedFileParams>,
+ options?: SecondParameter<typeof customInstance>,signal?: AbortSignal
 ) => {
-  params = toValue(params);
+      params = toValue(params);
 
-  return customInstance<ResultPageResultShareLinkVO>(
-    {
-      url: `/api/shares/list`, method: 'GET',
-      params, signal
+      return customInstance<ResultPageResultShareLinkVO>(
+      {url: `/api/shares/list`, method: 'GET',
+        params, signal
     },
-    options);
-}
+      options);
+    }
 
 
 
 
 export const getListSharedFileQueryKey = (params?: MaybeRefOrGetter<ListSharedFileParams>,) => {
-  return [
-    'api', 'shares', 'list', ...(params ? [params] : [])
-  ] as const;
-}
+    return [
+    'api','shares','list', ...(params ? [params] : [])
+    ] as const;
+    }
 
 
-export const getListSharedFileQueryOptions = <TData = Awaited<ReturnType<typeof listSharedFile>>, TError = unknown>(params: MaybeRefOrGetter<ListSharedFileParams>, options?: { query?: Partial<UseQueryOptions<Awaited<ReturnType<typeof listSharedFile>>, TError, TData>>, request?: SecondParameter<typeof customInstance> }
+export const getListSharedFileQueryOptions = <TData = Awaited<ReturnType<typeof listSharedFile>>, TError = unknown>(params: MaybeRefOrGetter<ListSharedFileParams>, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof listSharedFile>>, TError, TData>>, request?: SecondParameter<typeof customInstance>}
 ) => {
 
-  const { query: queryOptions, request: requestOptions } = options ?? {};
+const {query: queryOptions, request: requestOptions} = options ?? {};
 
-  const queryKey = getListSharedFileQueryKey(params);
-
-
-
-  const queryFn: QueryFunction<Awaited<ReturnType<typeof listSharedFile>>> = ({ signal }) => listSharedFile(params, requestOptions, signal);
+  const queryKey =  getListSharedFileQueryKey(params);
 
 
 
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof listSharedFile>>> = ({ signal }) => listSharedFile(params, requestOptions, signal);
 
 
-  return { queryKey, queryFn, ...queryOptions } as UseQueryOptions<Awaited<ReturnType<typeof listSharedFile>>, TError, TData>
+
+
+
+   return  { queryKey, queryFn, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof listSharedFile>>, TError, TData>
 }
 
 export type ListSharedFileQueryResult = NonNullable<Awaited<ReturnType<typeof listSharedFile>>>
@@ -366,11 +357,11 @@ export type ListSharedFileQueryError = unknown
  */
 
 export function useListSharedFile<TData = Awaited<ReturnType<typeof listSharedFile>>, TError = unknown>(
-  params: MaybeRefOrGetter<ListSharedFileParams>, options?: { query?: Partial<UseQueryOptions<Awaited<ReturnType<typeof listSharedFile>>, TError, TData>>, request?: SecondParameter<typeof customInstance> }
-  , queryClient?: QueryClient
-): UseQueryReturnType<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> } {
+ params: MaybeRefOrGetter<ListSharedFileParams>, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof listSharedFile>>, TError, TData>>, request?: SecondParameter<typeof customInstance>}
+ , queryClient?: QueryClient
+ ): UseQueryReturnType<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> } {
 
-  const queryOptions = getListSharedFileQueryOptions(params, options)
+  const queryOptions = getListSharedFileQueryOptions(params,options)
 
   const query = useQuery(queryOptions, queryClient) as UseQueryReturnType<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> };
 
@@ -389,45 +380,44 @@ export function useListSharedFile<TData = Awaited<ReturnType<typeof listSharedFi
  * @summary 访问他人分享详情
  */
 export const getShareInfo = (
-  params: MaybeRefOrGetter<GetShareInfoParams>,
-  options?: SecondParameter<typeof customInstance>, signal?: AbortSignal
+    params: MaybeRefOrGetter<GetShareInfoParams>,
+ options?: SecondParameter<typeof customInstance>,signal?: AbortSignal
 ) => {
-  params = toValue(params);
+      params = toValue(params);
 
-  return customInstance<ResultListVirtualFileVO>(
-    {
-      url: `/api/shares/info`, method: 'GET',
-      params, signal
+      return customInstance<ResultListVirtualFileVO>(
+      {url: `/api/shares/info`, method: 'GET',
+        params, signal
     },
-    options);
-}
+      options);
+    }
 
 
 
 
 export const getGetShareInfoQueryKey = (params?: MaybeRefOrGetter<GetShareInfoParams>,) => {
-  return [
-    'api', 'shares', 'info', ...(params ? [params] : [])
-  ] as const;
-}
+    return [
+    'api','shares','info', ...(params ? [params] : [])
+    ] as const;
+    }
 
 
-export const getGetShareInfoQueryOptions = <TData = Awaited<ReturnType<typeof getShareInfo>>, TError = unknown>(params: MaybeRefOrGetter<GetShareInfoParams>, options?: { query?: Partial<UseQueryOptions<Awaited<ReturnType<typeof getShareInfo>>, TError, TData>>, request?: SecondParameter<typeof customInstance> }
+export const getGetShareInfoQueryOptions = <TData = Awaited<ReturnType<typeof getShareInfo>>, TError = unknown>(params: MaybeRefOrGetter<GetShareInfoParams>, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getShareInfo>>, TError, TData>>, request?: SecondParameter<typeof customInstance>}
 ) => {
 
-  const { query: queryOptions, request: requestOptions } = options ?? {};
+const {query: queryOptions, request: requestOptions} = options ?? {};
 
-  const queryKey = getGetShareInfoQueryKey(params);
-
-
-
-  const queryFn: QueryFunction<Awaited<ReturnType<typeof getShareInfo>>> = ({ signal }) => getShareInfo(params, requestOptions, signal);
+  const queryKey =  getGetShareInfoQueryKey(params);
 
 
 
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof getShareInfo>>> = ({ signal }) => getShareInfo(params, requestOptions, signal);
 
 
-  return { queryKey, queryFn, ...queryOptions } as UseQueryOptions<Awaited<ReturnType<typeof getShareInfo>>, TError, TData>
+
+
+
+   return  { queryKey, queryFn, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof getShareInfo>>, TError, TData>
 }
 
 export type GetShareInfoQueryResult = NonNullable<Awaited<ReturnType<typeof getShareInfo>>>
@@ -439,11 +429,11 @@ export type GetShareInfoQueryError = unknown
  */
 
 export function useGetShareInfo<TData = Awaited<ReturnType<typeof getShareInfo>>, TError = unknown>(
-  params: MaybeRefOrGetter<GetShareInfoParams>, options?: { query?: Partial<UseQueryOptions<Awaited<ReturnType<typeof getShareInfo>>, TError, TData>>, request?: SecondParameter<typeof customInstance> }
-  , queryClient?: QueryClient
-): UseQueryReturnType<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> } {
+ params: MaybeRefOrGetter<GetShareInfoParams>, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getShareInfo>>, TError, TData>>, request?: SecondParameter<typeof customInstance>}
+ , queryClient?: QueryClient
+ ): UseQueryReturnType<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> } {
 
-  const queryOptions = getGetShareInfoQueryOptions(params, options)
+  const queryOptions = getGetShareInfoQueryOptions(params,options)
 
   const query = useQuery(queryOptions, queryClient) as UseQueryReturnType<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> };
 
@@ -462,45 +452,44 @@ export function useGetShareInfo<TData = Awaited<ReturnType<typeof getShareInfo>>
  * @summary 下载文件
  */
 export const downloadSharedFile = (
-  params: MaybeRefOrGetter<DownloadSharedFileParams>,
-  options?: SecondParameter<typeof customInstance>, signal?: AbortSignal
+    params: MaybeRefOrGetter<DownloadSharedFileParams>,
+ options?: SecondParameter<typeof customInstance>,signal?: AbortSignal
 ) => {
-  params = toValue(params);
+      params = toValue(params);
 
-  return customInstance<ResultString>(
-    {
-      url: `/api/shares/download`, method: 'GET',
-      params, signal
+      return customInstance<ResultString>(
+      {url: `/api/shares/download`, method: 'GET',
+        params, signal
     },
-    options);
-}
+      options);
+    }
 
 
 
 
 export const getDownloadSharedFileQueryKey = (params?: MaybeRefOrGetter<DownloadSharedFileParams>,) => {
-  return [
-    'api', 'shares', 'download', ...(params ? [params] : [])
-  ] as const;
-}
+    return [
+    'api','shares','download', ...(params ? [params] : [])
+    ] as const;
+    }
 
 
-export const getDownloadSharedFileQueryOptions = <TData = Awaited<ReturnType<typeof downloadSharedFile>>, TError = unknown>(params: MaybeRefOrGetter<DownloadSharedFileParams>, options?: { query?: Partial<UseQueryOptions<Awaited<ReturnType<typeof downloadSharedFile>>, TError, TData>>, request?: SecondParameter<typeof customInstance> }
+export const getDownloadSharedFileQueryOptions = <TData = Awaited<ReturnType<typeof downloadSharedFile>>, TError = unknown>(params: MaybeRefOrGetter<DownloadSharedFileParams>, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof downloadSharedFile>>, TError, TData>>, request?: SecondParameter<typeof customInstance>}
 ) => {
 
-  const { query: queryOptions, request: requestOptions } = options ?? {};
+const {query: queryOptions, request: requestOptions} = options ?? {};
 
-  const queryKey = getDownloadSharedFileQueryKey(params);
-
-
-
-  const queryFn: QueryFunction<Awaited<ReturnType<typeof downloadSharedFile>>> = ({ signal }) => downloadSharedFile(params, requestOptions, signal);
+  const queryKey =  getDownloadSharedFileQueryKey(params);
 
 
 
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof downloadSharedFile>>> = ({ signal }) => downloadSharedFile(params, requestOptions, signal);
 
 
-  return { queryKey, queryFn, ...queryOptions } as UseQueryOptions<Awaited<ReturnType<typeof downloadSharedFile>>, TError, TData>
+
+
+
+   return  { queryKey, queryFn, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof downloadSharedFile>>, TError, TData>
 }
 
 export type DownloadSharedFileQueryResult = NonNullable<Awaited<ReturnType<typeof downloadSharedFile>>>
@@ -512,11 +501,11 @@ export type DownloadSharedFileQueryError = unknown
  */
 
 export function useDownloadSharedFile<TData = Awaited<ReturnType<typeof downloadSharedFile>>, TError = unknown>(
-  params: MaybeRefOrGetter<DownloadSharedFileParams>, options?: { query?: Partial<UseQueryOptions<Awaited<ReturnType<typeof downloadSharedFile>>, TError, TData>>, request?: SecondParameter<typeof customInstance> }
-  , queryClient?: QueryClient
-): UseQueryReturnType<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> } {
+ params: MaybeRefOrGetter<DownloadSharedFileParams>, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof downloadSharedFile>>, TError, TData>>, request?: SecondParameter<typeof customInstance>}
+ , queryClient?: QueryClient
+ ): UseQueryReturnType<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> } {
 
-  const queryOptions = getDownloadSharedFileQueryOptions(params, options)
+  const queryOptions = getDownloadSharedFileQueryOptions(params,options)
 
   const query = useQuery(queryOptions, queryClient) as UseQueryReturnType<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> };
 
@@ -535,64 +524,62 @@ export function useDownloadSharedFile<TData = Awaited<ReturnType<typeof download
  * @summary 删除分享
  */
 export const cancelSharedFile = (
-  params: MaybeRefOrGetter<CancelSharedFileParams>,
-  options?: SecondParameter<typeof customInstance>, signal?: AbortSignal
+    params: MaybeRefOrGetter<CancelSharedFileParams>,
+ options?: SecondParameter<typeof customInstance>,signal?: AbortSignal
 ) => {
-  params = toValue(params);
+      params = toValue(params);
 
-  return customInstance<Result>(
-    {
-      url: `/api/shares/cancel`, method: 'DELETE',
-      params, signal
+      return customInstance<Result>(
+      {url: `/api/shares/cancel`, method: 'DELETE',
+        params, signal
     },
-    options);
-}
+      options);
+    }
 
 
 
 
 export const getCancelSharedFileMutationOptions = <TError = unknown,
-  TContext = unknown>(options?: { mutation?: UseMutationOptions<Awaited<ReturnType<typeof cancelSharedFile>>, TError, { params: CancelSharedFileParams }, TContext>, request?: SecondParameter<typeof customInstance> }
-  ): UseMutationOptions<Awaited<ReturnType<typeof cancelSharedFile>>, TError, { params: CancelSharedFileParams }, TContext> => {
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof cancelSharedFile>>, TError,{params: CancelSharedFileParams}, TContext>, request?: SecondParameter<typeof customInstance>}
+): UseMutationOptions<Awaited<ReturnType<typeof cancelSharedFile>>, TError,{params: CancelSharedFileParams}, TContext> => {
 
-  const mutationKey = ['cancelSharedFile'];
-  const { mutation: mutationOptions, request: requestOptions } = options ?
-    options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+const mutationKey = ['cancelSharedFile'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
       options
-      : { ...options, mutation: { ...options.mutation, mutationKey } }
-    : { mutation: { mutationKey, }, request: undefined };
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
 
 
 
 
-  const mutationFn: MutationFunction<Awaited<ReturnType<typeof cancelSharedFile>>, { params: CancelSharedFileParams }> = (props) => {
-    const { params } = props ?? {};
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof cancelSharedFile>>, {params: CancelSharedFileParams}> = (props) => {
+          const {params} = props ?? {};
 
-    return cancelSharedFile(params, requestOptions)
-  }
-
-
+          return  cancelSharedFile(params,requestOptions)
+        }
 
 
 
 
-  return { mutationFn, ...mutationOptions }
-}
 
-export type CancelSharedFileMutationResult = NonNullable<Awaited<ReturnType<typeof cancelSharedFile>>>
 
-export type CancelSharedFileMutationError = unknown
+  return  { mutationFn, ...mutationOptions }}
 
-/**
-* @summary 删除分享
-*/
+    export type CancelSharedFileMutationResult = NonNullable<Awaited<ReturnType<typeof cancelSharedFile>>>
+
+    export type CancelSharedFileMutationError = unknown
+
+    /**
+ * @summary 删除分享
+ */
 export const useCancelSharedFile = <TError = unknown,
-  TContext = unknown>(options?: { mutation?: UseMutationOptions<Awaited<ReturnType<typeof cancelSharedFile>>, TError, { params: CancelSharedFileParams }, TContext>, request?: SecondParameter<typeof customInstance> }
-    , queryClient?: QueryClient): UseMutationReturnType<
-      Awaited<ReturnType<typeof cancelSharedFile>>,
-      TError,
-      { params: CancelSharedFileParams },
-      TContext
-    > => {
-  return useMutation(getCancelSharedFileMutationOptions(options), queryClient);
-}
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof cancelSharedFile>>, TError,{params: CancelSharedFileParams}, TContext>, request?: SecondParameter<typeof customInstance>}
+ , queryClient?: QueryClient): UseMutationReturnType<
+        Awaited<ReturnType<typeof cancelSharedFile>>,
+        TError,
+        {params: CancelSharedFileParams},
+        TContext
+      > => {
+      return useMutation(getCancelSharedFileMutationOptions(options), queryClient);
+    }

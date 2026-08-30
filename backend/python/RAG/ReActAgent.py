@@ -15,6 +15,7 @@ from langgraph.prebuilt import ToolNode
 from langchain_core.prompts import ChatPromptTemplate, MessagesPlaceholder
 from langgraph.checkpoint.base import BaseCheckpointSaver
 
+from RAG.Logging import logger
 load_dotenv()
 
 # ================= 1. 定义 ReAct 工具集 =================
@@ -83,17 +84,12 @@ def build_agent_graph(
     tools = [search_knowledge_base]
     model_with_tools = llm.bind_tools(tools)
 
-    # 【新增】打印传给 LLM 的真实工具 Schema
-    print("=== 传给 LLM 的工具列表 ===")
-    for tool_dict in model_with_tools.kwargs.get("tools", []):
-        print(f"工具名: {tool_dict['function']['name']} | 描述: {tool_dict['function']['description']}")
-    print("===========================")
 
     # LLM 节点
     def llm_node(state: AgentState):
         chain = prompt_template | model_with_tools
         response = chain.invoke({"messages": state["messages"]})
-        print("LLM 原始工具调用意图:", response.tool_calls)
+        logger.info("LLM 原始工具调用意图:", response.tool_calls)
         return {"messages": [response]}
 
     # 工具节点

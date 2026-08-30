@@ -5,7 +5,6 @@
  * OpenAPI spec version: v0
  */
 
-export type GetDownloadUrlByKeyParams = {
-ossKey: string;
-expireHours?: number;
+export type Search1Params = {
+searchName: string;
 };

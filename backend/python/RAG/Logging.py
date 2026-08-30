@@ -69,3 +69,23 @@ def cleanup_logging():
     if _log_listener:
         _log_listener.stop()
         _initialized = False
+
+
+import structlog
+from structlog.contextvars import merge_contextvars
+def configure_structlog():
+    structlog.configure(
+        processors=[
+            merge_contextvars,                     # 注入 contextvars 中的字段
+            structlog.processors.add_log_level,    # 添加日志级别
+            structlog.processors.StackInfoRenderer(),
+            structlog.processors.format_exc_info,
+            structlog.processors.TimeStamper(fmt="iso"),
+            structlog.processors.JSONRenderer(ensure_ascii = False)    # 输出 JSON 格式
+        ],
+        wrapper_class=structlog.make_filtering_bound_logger(logging.INFO),
+        context_class=dict,
+        logger_factory=structlog.PrintLoggerFactory(),
+        cache_logger_on_first_use=True,
+    )
+logger = structlog.get_logger()

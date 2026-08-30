@@ -15,6 +15,8 @@ import demo.cloud.share.service.ShareService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.Parameter;
 import io.swagger.v3.oas.annotations.tags.Tag;
+import jakarta.validation.Valid;
+import jakarta.validation.constraints.Min;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
@@ -41,7 +43,7 @@ public class ShareController {
             description = "根据请求体创建分享链接"
     )
     @PostMapping("/share")
-    public Result<CreateShareResponse> shareFile(@RequestBody CreateShareRequest request){
+    public Result<CreateShareResponse> shareFile(@Valid @RequestBody CreateShareRequest request){
         Long userId = BaseContext.getUserId();
         CreateShareResponse share = shareService.createShare(request, userId);
         return Result.success(share);
@@ -55,9 +57,9 @@ public class ShareController {
     )
     @GetMapping("/list")
     public Result<PageResult<ShareLinkVO>> listSharedFile(@Parameter(description = "页码", example = "1001")
-                                                          @RequestParam Long pageNum,
+                                                          @RequestParam @Min(0) Long pageNum,
                                                           @Parameter(description = "页大小", example = "50")
-                                                          @RequestParam Long pageSize){
+                                                          @RequestParam @Min(0) Long pageSize){
         Long userId = BaseContext.getUserId();
         PageResult<ShareLinkVO> page = shareService.queryMyShare(pageNum, pageSize, userId);
         return Result.success(page);
@@ -70,7 +72,7 @@ public class ShareController {
         description = "删除指定的分享链接"
     )
     @DeleteMapping("/cancel")
-    public Result cancelSharedFile(@RequestParam Long shareId){
+    public Result cancelSharedFile(@RequestParam @Min(0) Long shareId){
         Long userId = BaseContext.getUserId();
         shareService.remove(new LambdaQueryWrapper<ShareLink>()
                 .eq(ShareLink::getId,shareId)
@@ -110,23 +112,23 @@ public class ShareController {
     )
     @GetMapping("/info")
     public Result<List<VirtualFileVO>> getShareInfo(@RequestHeader("Share-Token") String shareToken,
-                                                    @RequestParam Long parentId,
-                                                    @RequestParam Long rootId
+                                                    @RequestParam @Min(0) Long parentId,
+                                                    @RequestParam @Min(0) Long rootId
                                                     ){
         List<VirtualFileVO> shareInfo = shareService.getShareInfo(shareToken, parentId, rootId);
 
         return Result.success(shareInfo);
     }
 
-    //TODO 完善
+
     @Operation(summary = "下载文件",
         description = "访问者直接在网页中下载文件，返回一个下载链接"
     )
     @GetMapping("/download")
     //访问者下载文件
     public Result<String> downloadSharedFile(@RequestHeader("Share-Token") String shareToken,
-                                     Long id,
-                                     Long rootId
+                                     @Min(0) Long id,
+                                     @Min(0) Long rootId
                                      ){
         String downloadUrl = shareService.generateDownloadUrl(shareToken, id, rootId);
         return Result.success(downloadUrl);
@@ -138,7 +140,7 @@ public class ShareController {
     @PostMapping("/save")
     //访问者转存到自己的网盘中
     public Result saveSharedFile(@RequestHeader("Share-Token") String shareToken,
-                                 @RequestBody TransferRequest request){
+                                 @RequestBody @Valid TransferRequest request){
         Long userId = BaseContext.getUserId();
         shareService.saveToMyDisk(shareToken, userId, request);
         return Result.success();

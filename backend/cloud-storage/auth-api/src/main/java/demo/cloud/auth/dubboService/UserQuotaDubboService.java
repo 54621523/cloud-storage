@@ -1,5 +1,7 @@
 package demo.cloud.auth.dubboService;
 
+import demo.cloud.auth.dto.QuotaInfo;
+
 public interface UserQuotaDubboService {
 
     // 1. 检查配额是否足够（上传前调用）

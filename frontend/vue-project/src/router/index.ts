@@ -49,12 +49,12 @@ export const routes = [
   {
     path: '/testUpload',
     name: 'testUP',
-    component: () => import('@/components/Disk/test.vue')
+    component: () => import('@/components/Disk/testUploader.vue')
   },
   {
-    path: '/testTrash',
-    name: 'testTrash',
-    component: () => import('@/modules/trash-system/components/TrashPanel.vue')
+    path: '/testSSE',
+    name: 'testSSE',
+    component: () => import('@/components/AITools/testSSE.vue')
   },
   {
     path: '/ai',

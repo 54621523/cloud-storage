@@ -9,6 +9,8 @@ from RAG.core import get_vectorstore, get_embeddings_model, get_meilisearch_clie
 from langchain_core.vectorstores import VectorStore
 import meilisearch
 
+from RAG.Logging import logger
+
 from routers import documents
 from routers import ai
 
@@ -53,7 +55,7 @@ async def nacos():
                 port=SERVICE_PORT,
                 enabled=True,
                 healthy=True, ephemeral=True))
-    print(f"✅ 服务 { SERVICE_NAME} 注册到nacos上")
+    logger.info(f"✅ 服务 { SERVICE_NAME} 注册到nacos上")
 
 
     yield
@@ -64,7 +66,7 @@ async def nacos():
           request=DeregisterInstanceParam(service_name=SERVICE_NAME, group_name='DEFAULT_GROUP', ip=get_local_ip(),
                                           port=SERVICE_NAME, ephemeral=True)
       )
-    print(f"✅ 服务 {SERVICE_NAME} 在nacos上销毁")
+    logger.info(f"✅ 服务 {SERVICE_NAME} 在nacos上销毁")
 
 app = FastAPI(lifespan = manager)
 

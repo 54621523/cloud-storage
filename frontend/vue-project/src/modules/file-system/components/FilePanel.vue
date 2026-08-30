@@ -83,7 +83,7 @@ import { ref, inject } from 'vue';
 import { ElMessage, ElMessageBox } from 'element-plus';
 import { FileItemType, type FileItemUI } from '@/modules/file-system/types/file';
 import { formatFileSize, formatDate } from '@/utils/format';
-import { FILE_EXPLORER_KEY } from '@/symbol';
+import { FILE_EXPLORER_KEY } from '@/constants/symbol';
 import FileIcon from '@/modules/file-system/components/FileIcon.vue';
 
 
@@ -110,6 +110,8 @@ const {
   renameFile,
   deleteFiles,
   downloadFilesV2,
+
+  parentId
 } = fileContext;
 
 
@@ -177,6 +179,7 @@ const handleRowClick = (row: FileItemUI) => {
   if (row.type === FileItemType.FOLDER) {
     clearSelection();
     navigateTo(row);
+    console.log(parentId.value)
   }
 };
 </script>

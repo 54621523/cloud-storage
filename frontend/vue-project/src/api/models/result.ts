@@ -15,5 +15,5 @@ export interface Result {
   /** 响应消息 */
   msg?: string;
   /** 响应数据 */
-  data?: ResultData;
+  data: ResultData;
 }

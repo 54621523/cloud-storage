@@ -100,7 +100,6 @@ export function useMyShares(options?: { enabled?: Ref<boolean> }) {
     // ---- 取消分享 ----
     const cancelShareMutation = useCancelSharedFile({
         mutation: {
-            // 移除 onSuccess 中的 refresh
             onError: (err) => ElMessage.error(getErrorMessage(err) || '取消分享失败'),
         },
     });
@@ -108,14 +107,13 @@ export function useMyShares(options?: { enabled?: Ref<boolean> }) {
     async function cancelShare(shareId: number) {
         await cancelShareMutation.mutateAsync({ params: { shareId } });
         ElMessage.success('已取消分享');
-        refresh(); // 统一刷新
+        refresh();
     }
 
-    // ---- 批量取消分享（新增） ----
+    // ---- 批量取消分享 ----
     async function cancelShares(shareIds: number[]) {
         if (shareIds.length === 0) return;
         await Promise.all(shareIds.map(id => cancelShare(id)));
-        // cancelShare 内部已调用 refresh，无需额外刷新
     }
 
     return {

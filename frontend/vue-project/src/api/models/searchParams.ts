@@ -5,7 +5,6 @@
  * OpenAPI spec version: v0
  */
 
-/**
- * 响应数据
- */
-export type ResultVoidData = { [key: string]: unknown };
+export type SearchParams = {
+keyword: string;
+};

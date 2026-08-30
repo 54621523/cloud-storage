@@ -14,5 +14,5 @@ export interface ResultPageResultShareLinkVO {
   code?: number;
   /** 响应消息 */
   msg?: string;
-  data?: PageResultShareLinkVO;
+  data: PageResultShareLinkVO;
 }

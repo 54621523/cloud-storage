@@ -17,7 +17,6 @@ async def ingest_document(
     metadata: Annotated[Optional[dict[str, Any]], Body(embed=True)],
     rag_service: Annotated[RAGIngestionService,Depends(get_rag_service)]
 ):
-    print('调用了摄入方法')
     try:
         # 直接调用业务方法，无需关心底层的 Converter、Chunker 等是如何创建的
         result = await rag_service.ingest_document(

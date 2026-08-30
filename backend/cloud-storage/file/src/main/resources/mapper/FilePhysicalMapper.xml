@@ -1,0 +1,17 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+        "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="demo.cloud.file.mapper.FilePhysicalMapper">
+    <update id="batchIncrementRefCount">
+        UPDATE file_physical SET ref_count = ref_count + 1 WHERE id IN
+        <foreach collection="ids" item="id" open="(" separator="," close=")">
+            #{id}
+        </foreach>
+    </update>
+    <update id="batchDecrementRefCount">
+        UPDATE file_physical SET ref_count = ref_count - 1 WHERE file_physical.ref_count >1 AND id IN
+        <foreach collection="ids" item="id" open="(" separator="," close=")">
+            #{id}
+        </foreach>
+    </update>
+</mapper>

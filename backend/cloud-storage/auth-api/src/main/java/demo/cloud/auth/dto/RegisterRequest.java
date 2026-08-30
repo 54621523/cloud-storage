@@ -1,6 +1,7 @@
 package demo.cloud.auth.dto;
 
 import io.swagger.v3.oas.annotations.media.Schema;
+import jakarta.validation.constraints.Email;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.Size;
 import lombok.Data;
@@ -18,7 +19,7 @@ public class RegisterRequest {
     private String username;
 
     // 邮箱（允许为空）
-    @Size(max = 50, message = "邮箱长度不能超过50个字符")
+    @Email
     @Schema(description = "邮箱",
             example = "example@ex.com"
     )

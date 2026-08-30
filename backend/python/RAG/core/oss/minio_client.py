@@ -4,7 +4,7 @@ from minio import Minio
 from dotenv import load_dotenv
 from .base_oss import BaseOSSClient
 from typing import BinaryIO
-
+from RAG.Logging import logger
 load_dotenv()
 
 class MinIOClient(BaseOSSClient):
@@ -27,7 +27,7 @@ class MinIOClient(BaseOSSClient):
             )
             return True
         except Exception as e:
-            print(f"MinIO Upload Error: {e}")
+            logger.info(f"MinIO Upload Error: {e}")
             return False
 
     async def download_file(self, bucket_name: str, object_name: str, file_path: str) -> bool:
@@ -38,7 +38,7 @@ class MinIOClient(BaseOSSClient):
             )
             return True
         except Exception as e:
-            print(f"MinIO Download Error: {e}")
+            logger.info(f"MinIO Download Error: {e}")
             return False
 
     async def delete_file(self, bucket_name: str, object_name: str) -> bool:
@@ -49,7 +49,7 @@ class MinIOClient(BaseOSSClient):
             )
             return True
         except Exception as e:
-            print(f"MinIO Delete Error: {e}")
+            logger.info(f"MinIO Delete Error: {e}")
             return False
         
     

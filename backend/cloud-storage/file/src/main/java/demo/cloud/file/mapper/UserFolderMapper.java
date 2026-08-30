@@ -9,7 +9,9 @@ import org.apache.ibatis.annotations.Mapper;
 import org.apache.ibatis.annotations.Options;
 import org.apache.ibatis.annotations.Param;
 
+import java.util.Collection;
 import java.util.List;
+import java.util.Set;
 
 @Mapper
 public interface UserFolderMapper extends BaseMapper<UserFolder> {
@@ -38,4 +40,9 @@ public interface UserFolderMapper extends BaseMapper<UserFolder> {
             "VALUES (#{userId}, #{parentId}, #{name}, NOW(), NOW())")
     @Options(useGeneratedKeys = true, keyProperty = "id")
     int insertIgnore(UserFolder newFolder);
+
+    Set<Long> getFolderChildren(@Param("folderIds") Collection<Long> folderIds,
+                                @Param("userId") Long userId);
+
+
 }

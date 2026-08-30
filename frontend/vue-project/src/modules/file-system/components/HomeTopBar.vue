@@ -4,7 +4,7 @@
 
       <!-- 左侧区域：上传按钮 + 胶囊工具栏 -->
       <div class="left-actions">
-        <FileUploader :current-parent-id="currentParentId" />
+        <FileUploader :current-parent-id="parentId" />
 
         <div class="capsule-toolbar">
           <div v-for="item in menuItems" :key="item.id" class="toolbar-item action-btn"
@@ -27,7 +27,7 @@
 import { ref, computed, inject } from 'vue';
 import { ElMessage, ElMessageBox } from 'element-plus';
 import FileUploader from '@/modules/file-system/components/FileUploader.vue';
-import { FILE_EXPLORER_KEY } from '@/symbol';
+import { FILE_EXPLORER_KEY } from '@/constants/symbol';
 import type { FileItemUI } from '@/modules/file-system/types/file';
 
 const fileContext = inject(FILE_EXPLORER_KEY)
@@ -35,7 +35,6 @@ if (!fileContext) throw new Error('fileExplorer not provided');
 
 
 const { selectedCount, selectedList, createFolder, deleteFiles, downloadFilesV2, parentId } = fileContext;
-let currentParentId = parentId.value
 
 
 const shareControl = inject<{ openShareDialog: (files?: FileItemUI[]) => void }>('shareControl');

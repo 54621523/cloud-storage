@@ -5,6 +5,9 @@
  * OpenAPI spec version: v0
  */
 
+/**
+ * 响应数据
+ */
 export interface InitResponseV2 {
   uploadId?: string;
   chunkSize?: number;

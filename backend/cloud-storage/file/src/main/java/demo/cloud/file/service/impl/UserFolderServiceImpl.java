@@ -10,6 +10,7 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.apache.dubbo.config.annotation.DubboService;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 
 
 @DubboService(interfaceClass = UserFolderDubboService.class)
@@ -31,5 +32,36 @@ public class UserFolderServiceImpl extends ServiceImpl<UserFolderMapper, UserFol
                 .rootFolderID(userFolder.getId())
                 .rootFolderName(userFolder.getName())
                 .build();
+    }
+
+    /**
+     * @param userId
+     */
+    @Override
+    @Transactional(rollbackFor = Exception.class)
+    public UserRootFolderDTO createRootFolder(Long userId) {
+        UserFolder userFolder = new UserFolder();
+        userFolder.setName("我的文件");
+        userFolder.setUserId(userId);
+        userFolderMapper.insert(userFolder);
+        UserRootFolderDTO dto = new UserRootFolderDTO();
+        dto.setRootFolderID(userFolder.getId());
+        dto.setRootFolderName(userFolder.getName());
+        return dto;
+    }
+
+    /**
+     * @param parentId
+     * @param userId
+     * @return
+     */
+    @Override
+    public boolean isOwner(Long parentId, Long userId) {
+        return userFolderMapper.exists(
+                new LambdaQueryWrapper<UserFolder>()
+                        .eq(UserFolder::getId, parentId)
+                        .eq(UserFolder::getUserId, userId)
+                        .isNull(UserFolder::getDeletedAt)
+        );
     }
 }

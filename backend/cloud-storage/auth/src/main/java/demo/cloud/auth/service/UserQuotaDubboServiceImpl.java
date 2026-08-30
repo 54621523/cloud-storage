@@ -9,7 +9,7 @@ import org.apache.dubbo.config.annotation.DubboService;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 
-@DubboService(version = "1.0.0") // 暴露 Dubbo 服务
+@DubboService(version = "1.0.0")
 @Service
 public class UserQuotaDubboServiceImpl implements UserQuotaDubboService {
 
@@ -17,44 +17,95 @@ public class UserQuotaDubboServiceImpl implements UserQuotaDubboService {
     private UserMapper userMapper;
 
     /**
-     * @param userId
-     * @param fileSize
-     * @return
+     * 检查用户剩余配额是否足够
+     * @param userId   用户ID
+     * @param fileSize 需要占用的空间（字节）
+     * @return true-足够，false-不足或用户不存在
      */
     @Override
     public boolean hasEnoughQuota(Long userId, Long fileSize) {
-        return false;
-    }
-
-    @Override
-    public boolean addUsedQuota(Long userId, Long fileSize) {
-        // MyBatis-Plus 乐观锁更新：update user set quota_used = quota_used + #{size}, version = version + 1 
-        // where id = #{userId} and quota_total - quota_used >= #{size} and version = #{version}
-        LambdaUpdateWrapper<User> wrapper = new LambdaUpdateWrapper<>();
-        wrapper.eq(User::getUserId, userId)
-                .ge(User::getQuotaTotal, User::getQuotaTotal + fileSize)
-                .setSql("quota_used = quota_used + " + fileSize)
-                .setSql("version = version + 1");
-        return userMapper.update(null, wrapper) > 0;
+        User user = userMapper.selectById(userId);
+        if (user == null) {
+            return false;
+        }
+        Long available = user.getQuotaTotal() - user.getQuotaUsed();
+        return available >= fileSize;
     }
 
     /**
-     * @param userId
-     * @param fileSize
-     * @return
+     * 增加已用配额（如上传文件），采用乐观锁防止并发超扣
+     * @param userId   用户ID
+     * @param fileSize 增加的空间（字节）
+     * @return true-更新成功，false-配额不足或乐观锁失败
+     */
+    @Override
+    public boolean addUsedQuota(Long userId, Long fileSize) {
+        // 先查询当前用户信息（含version）
+        User user = userMapper.selectById(userId);
+        if (user == null) {
+            return false;
+        }
+        // 检查剩余配额是否足够
+        if (user.getQuotaTotal() - user.getQuotaUsed() < fileSize) {
+            return false;
+        }
+
+        LambdaUpdateWrapper<User> wrapper = new LambdaUpdateWrapper<>();
+        wrapper.eq(User::getUserId, userId)
+                .eq(User::getVersion, user.getVersion())          // 乐观锁版本条件
+                .apply("quota_total - quota_used >= {0}", fileSize) // 再次检查剩余空间（防并发）
+                .setSql("quota_used = quota_used + " + fileSize)
+                .setSql("version = version + 1");
+
+        int rows = userMapper.update(null, wrapper);
+        return rows > 0;
+    }
+
+    /**
+     * 减少已用配额（如删除文件），采用乐观锁
+     * @param userId   用户ID
+     * @param fileSize 减少的空间（字节）
+     * @return true-更新成功，false-用户不存在或已用配额不足
      */
     @Override
     public boolean subtractUsedQuota(Long userId, Long fileSize) {
-        return false;
+        // 先查询当前用户信息（含version）
+        User user = userMapper.selectById(userId);
+        if (user == null) {
+            return false;
+        }
+        // 检查已用配额是否足够扣除（避免负数）
+        if (user.getQuotaUsed() < fileSize) {
+            return false;
+        }
+
+        LambdaUpdateWrapper<User> wrapper = new LambdaUpdateWrapper<>();
+        wrapper.eq(User::getUserId, userId)
+                .eq(User::getVersion, user.getVersion())          // 乐观锁版本条件
+                .apply("quota_used >= {0}", fileSize)             // 再次检查（防并发）
+                .setSql("quota_used = quota_used - " + fileSize)
+                .setSql("version = version + 1");
+
+        int rows = userMapper.update(null, wrapper);
+        return rows > 0;
     }
 
     /**
-     * @param userId
-     * @return
+     * 获取用户配额信息
+     * @param userId 用户ID
+     * @return QuotaInfo 对象，包含总配额、已用、剩余；若用户不存在则返回 null
      */
     @Override
     public QuotaInfo getQuotaInfo(Long userId) {
-        return null;
+        User user = userMapper.selectById(userId);
+        if (user == null) {
+            return null;
+        }
+        QuotaInfo info = new QuotaInfo();
+        info.setUserId(userId);
+        info.setQuotaTotal(user.getQuotaTotal());
+        info.setQuotaUsed(user.getQuotaUsed());
+        info.setQuotaAvailable(user.getQuotaTotal() - user.getQuotaUsed());
+        return info;
     }
-    // ... 其他方法实现
 }

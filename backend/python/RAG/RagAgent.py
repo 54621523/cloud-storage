@@ -5,6 +5,8 @@ import operator
 from dotenv import load_dotenv
 from typing_extensions import TypedDict
 
+from RAG.Logging import logger
+
 
 
 from langchain.chat_models import init_chat_model
@@ -201,7 +203,7 @@ def build_simple_subgraph(llm: ChatOpenAI, vectorstore):
         # 尝试获取 question
         question = state.get("question")
         if not question:
-            print("初始化节点警告：question 缺失")
+            logger.warn("初始化节点警告：question 缺失")
             return{
                 "should_stop": True
             }
@@ -211,7 +213,7 @@ def build_simple_subgraph(llm: ChatOpenAI, vectorstore):
             question = str(question) if question is not None else ""
         doc_ids = state.get("allowed_doc_ids")
         if not doc_ids:
-            print("初始化节点警告： allowed_doc_ids 缺失")
+            logger.warn("初始化节点警告： allowed_doc_ids 缺失")
             return{
                 "should_stop": True
             }
@@ -252,6 +254,14 @@ def build_simple_subgraph(llm: ChatOpenAI, vectorstore):
                 # "page_number": page,
                 "text": doc.page_content[:200] + "..." # 只传摘要给前端展示，避免流量过大
             })
+
+            contexts = [doc.page_content for doc in docs]
+            logger.info(
+                "retrieved_contexts",
+                question=state["question"],
+                contexts=contexts,
+                doc_ids=[doc.metadata.get("doc_id") for doc in docs],
+            )
     
         # 3. 返回结果
         return {

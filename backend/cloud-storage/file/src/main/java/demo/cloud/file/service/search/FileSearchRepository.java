@@ -1,87 +1,55 @@
 package demo.cloud.file.service.search;
 
-import com.meilisearch.sdk.model.SearchResultPaginated;
-import demo.cloud.file.config.MeilisearchTemplate;
+import com.fasterxml.jackson.databind.ObjectMapper;
+import demo.cloud.common.pojo.PageResult;
+import demo.cloud.file.pojo.FileDocument;
+import jakarta.annotation.PostConstruct;
 import lombok.extern.slf4j.Slf4j;
-import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Repository;
+import org.springframework.util.StringUtils;
 
-import java.math.BigDecimal;
 import java.util.ArrayList;
 import java.util.List;
 
 @Slf4j
 @Repository
-public class DishSearchRepository {
+public class FileSearchRepository extends GenericSearchRepository<FileDocument> {
 
-    private static final String INDEX_UID = "dish";
-    private static final String PRIMARY_KEY = "id";
-
-    @Autowired
-    private MeilisearchTemplate meilisearchTemplate;
-
-    public void initIndex() {
-        meilisearchTemplate.createIndex(INDEX_UID, PRIMARY_KEY);
-        String[] searchableAttributes = {"name", "description", "categoryName", "flavors.value", "flavors.name"};
-        String[] filterableAttributes = {"categoryId", "categoryName", "status", "price"};
-        String[] sortableAttributes = {"price", "updateTime"};
-        meilisearchTemplate.updateSettings(INDEX_UID, searchableAttributes, filterableAttributes, sortableAttributes);
+    public FileSearchRepository(ObjectMapper objectMapper) {
+        super(FileDocument.class, objectMapper);
     }
 
-    public void addDish(DishDocument dishDocument) {
-        List<DishDocument> documents = new ArrayList<>();
-        documents.add(dishDocument);
-        meilisearchTemplate.addDocuments(INDEX_UID, documents, PRIMARY_KEY);
+    @PostConstruct
+    public void initialize() {
+        initIndex();  // 父类方法
     }
 
-    public void addDishes(List<DishDocument> dishDocuments) {
-        meilisearchTemplate.addDocuments(INDEX_UID, dishDocuments, PRIMARY_KEY);
-    }
-
-    public void updateDish(DishDocument dishDocument) {
-        List<DishDocument> documents = new ArrayList<>();
-        documents.add(dishDocument);
-        meilisearchTemplate.updateDocuments(INDEX_UID, documents, PRIMARY_KEY);
-    }
-
-    public void deleteDish(Long dishId) {
-        meilisearchTemplate.deleteDocument(INDEX_UID, String.valueOf(dishId));
-    }
-
-    public SearchResultPaginated searchDishes(String name, int page, int pageSize, Long categoryId, Integer status) {
+    public PageResult<FileDocument> searchFile(String keyword,          // 模糊关键词
+                                       Long userId,      // 当前用户ID
+                                       Long parentId,           // 可选：限定某个文件夹内搜索
+                                       String extension,        // 可选：限定后缀
+                                       Long minSize, Long maxSize,
+                                       int page, int pageSize) {
         List<String> filters = new ArrayList<>();
 
-        if (categoryId != null) {
-            filters.add("categoryId=" + categoryId);
-        }
+        // ----- 权限过滤-----
+        // 规则：用户能看到 自己拥有的
+        String permissionFilter = "(userId=" + userId + ")";
+        filters.add(permissionFilter);
 
-        if (status != null) {
-            filters.add("status=" + status);
-        }
+        // ----- 状态过滤（默认排除回收站）-----
+        filters.add("status=0");
 
-        String[] filterArray = filters.toArray(new String[0]);
-
-        return meilisearchTemplate.search(INDEX_UID, name, page, pageSize, filterArray);
-    }
-
-    public SearchResultPaginated smartSearch(String keyword, int page, int pageSize, Long categoryId, Integer status,
-                                             BigDecimal minPrice, BigDecimal maxPrice) {
-        List<String> filters = new ArrayList<>();
-
-        if (categoryId != null && categoryId > 0) {
-            filters.add("categoryId=" + categoryId);
+        // ----- 业务过滤条件 -----
+        if (parentId != null && parentId > 0) {
+            filters.add("parentId=" + parentId); // 当前文件夹内搜索
         }
-        if (status != null) {
-            filters.add("status=" + status);
+        if (StringUtils.hasText(extension)) {
+            filters.add("extension=" + extension);
         }
-        if (minPrice != null && minPrice.compareTo(BigDecimal.ZERO) > 0) {
-            filters.add("price >= " + minPrice);
-        }
-        if (maxPrice != null && maxPrice.compareTo(BigDecimal.ZERO) > 0) {
-            filters.add("price <= " + maxPrice);
-        }
+        if (minSize != null) filters.add("fileSize >= " + minSize);
+        if (maxSize != null) filters.add("fileSize <= " + maxSize);
 
-        String[] filterArray = filters.toArray(new String[0]);
-        return meilisearchTemplate.search(INDEX_UID, keyword, page, pageSize, filterArray);
+        return super.search(keyword, filters, page, pageSize);
     }
 }

@@ -134,8 +134,6 @@ const copyLink = async (share: any) => {
 const handleDeleteShare = async (shareId: number) => {
   try {
     await cancelShare(shareId);
-    ElMessage.success('已取消分享');
-    refresh(); // 刷新列表
   } catch (err: any) {
     ElMessage.error(err?.message || '取消分享失败');
   }
