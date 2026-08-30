@@ -12,11 +12,7 @@ export interface RegisterRequest {
      * @maxLength 20
      */
   username?: string;
-  /**
-     * 邮箱
-     * @minLength 0
-     * @maxLength 50
-     */
+  /** 邮箱 */
   email?: string;
   /**
      * 手机号码

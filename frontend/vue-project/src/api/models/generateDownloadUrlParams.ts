@@ -6,5 +6,8 @@
  */
 
 export type GenerateDownloadUrlParams = {
+/**
+ * 虚拟文件ID
+ */
 virtualFileId: number;
 };

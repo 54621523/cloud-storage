@@ -1,47 +1,76 @@
-  <!-- HomeTopBar.vue -->
-  <template>
-    <div class="home-top-bar">
+<template>
+  <div class="home-top-bar">
 
-      <!-- 左侧区域：上传按钮 + 胶囊工具栏 -->
-      <div class="left-actions">
-        <FileUploader :current-parent-id="parentId" />
+    <!-- 左侧区域：上传按钮 + 胶囊工具栏 -->
+    <div class="left-actions">
+      <FileUploader :current-parent-id="parentId" />
 
-        <div class="capsule-toolbar">
-          <div v-for="item in menuItems" :key="item.id" class="toolbar-item action-btn"
-            @click="handleAction(item.action)">
-            <font-awesome-icon :icon="item.icon" />
-            <span>{{ item.label }}</span>
-          </div>
+      <div class="capsule-toolbar">
+        <div v-for="item in menuItems" :key="item.id" class="toolbar-item action-btn"
+          @click="handleAction(item.action)">
+          <font-awesome-icon :icon="item.icon" />
+          <span>{{ item.label }}</span>
         </div>
       </div>
-
-      <!-- 右侧区域：搜索栏 -->
-      <div class="right-search">
-        <input type="text" class="search-input" placeholder="搜索文件或文件夹..." v-model="searchKeyword" />
-      </div>
-
     </div>
-  </template>
+
+    <!-- 右侧区域：搜索栏 -->
+    <div class="right-search">
+      <input type="text" class="search-input" placeholder="搜索文件或文件夹..." v-model="searchKeyword" />
+      <!-- 可选：清空按钮 -->
+      <span v-if="searchKeyword" class="clear-btn" @click="searchKeyword = ''">✕</span>
+    </div>
+
+  </div>
+</template>
 
 <script setup lang="ts">
-import { ref, computed, inject } from 'vue';
+import { ref, computed, inject, watch, onUnmounted } from 'vue';
 import { ElMessage, ElMessageBox } from 'element-plus';
+import { debounce } from 'lodash-es'; // 或自己实现防抖
 import FileUploader from '@/modules/file-system/components/FileUploader.vue';
 import { FILE_EXPLORER_KEY } from '@/constants/symbol';
 import type { FileItemUI } from '@/modules/file-system/types/file';
 
-const fileContext = inject(FILE_EXPLORER_KEY)
+const fileContext = inject(FILE_EXPLORER_KEY);
 if (!fileContext) throw new Error('fileExplorer not provided');
 
-
-const { selectedCount, selectedList, createFolder, deleteFiles, downloadFilesV2, parentId } = fileContext;
-
+const {
+  selectedCount,
+  selectedList,
+  createFolder,
+  deleteFiles,
+  downloadFilesV2,
+  parentId,
+  search,
+  clearSearch
+} = fileContext;
 
 const shareControl = inject<{ openShareDialog: (files?: FileItemUI[]) => void }>('shareControl');
 
+// ---------- 搜索相关 ----------
 const searchKeyword = ref('');
 
-// 动态菜单项
+// 防抖搜索函数（用户停止输入 500ms 后执行）
+const debouncedSearch = debounce((keyword: string) => {
+  if (keyword.trim()) {
+    search(keyword.trim());
+  } else {
+    clearSearch();
+  }
+}, 500);
+
+// 监听输入变化
+watch(searchKeyword, (newVal) => {
+  debouncedSearch(newVal);
+});
+
+// 组件卸载时取消防抖，避免内存泄漏
+onUnmounted(() => {
+  debouncedSearch.cancel();
+});
+
+// ---------- 动态菜单 ----------
 const menuItems = computed(() => {
   const items = [
     { id: 1, label: '新建文件夹', icon: 'folder-plus', action: 'createFolder' },
@@ -56,14 +85,14 @@ const menuItems = computed(() => {
   return items;
 });
 
-// 统一操作入口
+// ---------- 操作处理 ----------
 const handleAction = async (action: string) => {
   switch (action) {
     case 'createFolder':
       await handleCreateFolder();
       break;
     case 'share':
-      shareControl?.openShareDialog(); // 不传参，默认分享所有选中的文件
+      shareControl?.openShareDialog();
       break;
     case 'download':
       await handleDownload();
@@ -76,7 +105,6 @@ const handleAction = async (action: string) => {
   }
 };
 
-// 新建文件夹
 const handleCreateFolder = async () => {
   try {
     const { value: name } = await ElMessageBox.prompt('请输入文件夹名称', '新建文件夹', {
@@ -87,7 +115,6 @@ const handleCreateFolder = async () => {
     });
     if (name) {
       await createFolder(name);
-
     }
   } catch (err: any) {
     if (err !== 'cancel') {
@@ -96,7 +123,6 @@ const handleCreateFolder = async () => {
   }
 };
 
-// 下载选中的文件
 const handleDownload = async () => {
   if (selectedList.value.length === 0) return;
   try {
@@ -107,7 +133,6 @@ const handleDownload = async () => {
   }
 };
 
-// 删除选中的文件/文件夹
 const handleDelete = async () => {
   if (selectedList.value.length === 0) return;
   try {
@@ -120,22 +145,12 @@ const handleDelete = async () => {
         type: 'warning',
       }
     );
-    // 不传 ids，默认删除所有选中的项
     await deleteFiles(selectedList.value);
-    // 删除成功后的消息由组合式函数内部处理
   } catch (err: any) {
     if (err !== 'cancel') {
       ElMessage.error('删除失败：' + (err.message || '未知错误'));
     }
   }
-};
-
-// 搜索处理（仅为 UI 演示，实际搜索可交由父组件或服务端）
-const handleSearch = () => {
-  // 若需要前端过滤，可在此触发自定义事件，由父组件处理
-  // 或扩展 useFileExplorer 提供 search 方法
-  console.log('搜索关键词:', searchKeyword.value);
-  // 这里可以触发一个事件，例如：emit('search', searchKeyword.value)
 };
 </script>
 
@@ -150,20 +165,15 @@ const handleSearch = () => {
   width: 100%;
 }
 
-/* 2. 左侧区域：弹性布局，防止胶囊过长挤压搜索栏 */
 .left-actions {
   display: flex;
   align-items: center;
   gap: 12px;
-  /* 上传按钮和胶囊之间的间距 */
   flex: 1;
-  /* 占据剩余空间 */
   min-width: 0;
-  /* 允许内部元素在必要时收缩 */
   width: 100%;
 }
 
-/* 3. 胶囊工具栏样式 */
 .capsule-toolbar {
   display: inline-flex;
   background-color: #eef2f6;
@@ -187,15 +197,15 @@ const handleSearch = () => {
   border-radius: 20px;
 }
 
-/* 4. 右侧搜索栏样式 */
 .right-search {
   flex-shrink: 0;
-  /* 防止搜索栏被压缩 */
   margin-left: 16px;
+  position: relative;
 }
 
 .search-input {
-  padding: 8px 16px;
+  padding: 8px 32px 8px 16px;
+  /* 右侧留出清空按钮空间 */
   border-radius: 20px;
   border: 1px solid #dce4ec;
   background-color: #f8fafc;
@@ -209,5 +219,23 @@ const handleSearch = () => {
   border-color: #4f7cff;
   background-color: #fff;
   box-shadow: 0 0 0 3px rgba(79, 124, 255, 0.1);
+}
+
+.clear-btn {
+  position: absolute;
+  right: 10px;
+  top: 50%;
+  transform: translateY(-50%);
+  cursor: pointer;
+  color: #999;
+  font-size: 14px;
+  padding: 2px 6px;
+  border-radius: 50%;
+  transition: background 0.2s;
+}
+
+.clear-btn:hover {
+  background: #e0e4ea;
+  color: #333;
 }
 </style>

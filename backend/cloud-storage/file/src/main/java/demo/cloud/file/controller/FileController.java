@@ -1,5 +1,6 @@
 package demo.cloud.file.controller;
 
+import demo.cloud.common.pojo.PageResult;
 import demo.cloud.common.pojo.Result;
 import demo.cloud.common.web.context.BaseContext;
 import demo.cloud.file.dto.*;
@@ -57,11 +58,15 @@ public class FileController {
     }
 
     @GetMapping("/search")
-    public Result<List<VirtualFileVO>> search(String searchName){
+    @Operation(summary = "搜索文件/文件夹", description = "根据关键词模糊搜索文件和文件夹，支持分页")
+    public Result<PageResult<VirtualFileVO>> search(
+            @RequestParam String keyword,
+            @RequestParam(defaultValue = "1") Integer page,
+            @RequestParam(defaultValue = "10") Integer size) {
         Long userId = BaseContext.getUserId();
-
-        fileManagerService.search(searchName, userId);
-        return Result.success();
+        log.info("用户 {} 搜索关键词: {}, page: {}, size: {}", userId, keyword, page, size);
+        PageResult<VirtualFileVO> result = fileManagerService.search(keyword, userId, page, size);
+        return Result.success(result);
     }
 
     // ==================== 2. 创建接口 ====================

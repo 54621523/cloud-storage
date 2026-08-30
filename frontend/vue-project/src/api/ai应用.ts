@@ -102,6 +102,71 @@ export const useStreamChat = <TError = unknown,
       return useMutation(getStreamChatMutationOptions(options), queryClient);
     }
     /**
+ * 用于测试 SSE 流，不实际调用 Python 服务
+ * @summary 模拟AI对话（测试）
+ */
+export const mockStreamChat = (
+    chatRequest: MaybeRefOrGetter<ChatRequest>,
+ options?: SecondParameter<typeof customInstance>,signal?: AbortSignal
+) => {
+      chatRequest = toValue(chatRequest);
+
+      return customInstance<SseEmitter>(
+      {url: `/api/ai/stream/chat/mock`, method: 'POST',
+      headers: {'Content-Type': 'application/json', },
+      data: chatRequest, signal
+    },
+      options);
+    }
+
+
+
+
+export const getMockStreamChatMutationOptions = <TError = unknown,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof mockStreamChat>>, TError,{data: ChatRequest}, TContext>, request?: SecondParameter<typeof customInstance>}
+): UseMutationOptions<Awaited<ReturnType<typeof mockStreamChat>>, TError,{data: ChatRequest}, TContext> => {
+
+const mutationKey = ['mockStreamChat'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof mockStreamChat>>, {data: ChatRequest}> = (props) => {
+          const {data} = props ?? {};
+
+          return  mockStreamChat(data,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type MockStreamChatMutationResult = NonNullable<Awaited<ReturnType<typeof mockStreamChat>>>
+    export type MockStreamChatMutationBody = ChatRequest
+    export type MockStreamChatMutationError = unknown
+
+    /**
+ * @summary 模拟AI对话（测试）
+ */
+export const useMockStreamChat = <TError = unknown,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof mockStreamChat>>, TError,{data: ChatRequest}, TContext>, request?: SecondParameter<typeof customInstance>}
+ , queryClient?: QueryClient): UseMutationReturnType<
+        Awaited<ReturnType<typeof mockStreamChat>>,
+        TError,
+        {data: ChatRequest},
+        TContext
+      > => {
+      return useMutation(getMockStreamChatMutationOptions(options), queryClient);
+    }
+    /**
  * 处理当前用户拥有的文档
  * @summary 处理已有文件
  */

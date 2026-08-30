@@ -10,11 +10,19 @@ import type { ShareItem } from './shareItem';
  * 创建分享的请求体
  */
 export interface CreateShareRequest {
-  /** 提取码 */
+  /**
+     * 提取码
+     * @minLength 4
+     * @maxLength 4
+     */
   password?: string;
   /** 过期时间 */
   expireTime?: string;
+  /**
+     * @minLength 0
+     * @maxLength 255
+     */
   displayName?: string;
   /** 分享的文件/文件夹对象 */
-  items?: ShareItem[];
+  items: ShareItem[];
 }

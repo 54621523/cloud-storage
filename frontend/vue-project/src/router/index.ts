@@ -47,16 +47,6 @@ export const routes = [
 
   },
   {
-    path: '/testUpload',
-    name: 'testUP',
-    component: () => import('@/components/Disk/testUploader.vue')
-  },
-  {
-    path: '/testSSE',
-    name: 'testSSE',
-    component: () => import('@/components/AITools/testSSE.vue')
-  },
-  {
     path: '/ai',
     name: 'AITools',
     component: AITools

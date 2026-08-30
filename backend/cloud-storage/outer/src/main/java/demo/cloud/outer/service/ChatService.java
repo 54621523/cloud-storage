@@ -173,7 +173,6 @@ public class ChatService {
             );
         } catch (Exception e) {
             log.error("消息投递 MQ 失败, sessionId: {}", sessionId, e);
-            //TODO 重试逻辑
         }
     }
 

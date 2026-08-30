@@ -18,6 +18,7 @@ import demo.cloud.file.service.UserRecycleBinService;
 import demo.cloud.file.service.search.FileSearchRepository;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.beans.BeanUtils;
 import org.springframework.dao.DuplicateKeyException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -58,24 +59,70 @@ public class FileManagerServiceImpl implements FileManagerService {
     /**
      *
      */
-    @Override
-    public void addDocument(Long id) {
-        UserFile one = userFileService.getOne(new LambdaQueryWrapper<UserFile>()
-                .eq(UserFile::getId, id)
-                .eq(UserFile::getUserId, 1L)
-                .last("Limit 1")
-        );
-        FileDocument userDocument = new FileDocument();
-        userDocument.setId(one.getId());
-        userDocument.setName(one.getName());
-        userDocument.setParentId(one.getParentId());
-        userDocument.setSize(one.getSize());
-        userDocument.setUserId(one.getUserId());
-        userDocument.setUpdateTime(one.getUpdateTime());
-        userDocument.setType(FileItemType.FILE);
-        userDocument.setStatus(0);
-        fileSearchRepository.addDocument(userDocument);
+    public void addDocument(Long id, FileItemType type) {
+        if (type == null) {
+            throw new IllegalArgumentException("类型不能为空");
+        }
 
+        FileDocument doc = new FileDocument();
+        doc.setId(id);
+        doc.setType(type);
+        doc.setStatus(0); // 默认正常
+
+        if (type == FileItemType.FILE) {
+            // 查询文件表
+            UserFile file = userFileService.getOne(
+                    new LambdaQueryWrapper<UserFile>()
+                            .eq(UserFile::getId, id)
+                            .last("LIMIT 1")
+            );
+            if (file == null) {
+                log.warn("文件不存在，id: {}", id);
+                return;
+            }
+            doc.setName(file.getName());
+            doc.setParentId(file.getParentId());
+            doc.setSize(file.getSize() != null ? file.getSize() : 0L);
+            doc.setUserId(file.getUserId());
+            doc.setUpdateTime(file.getUpdateTime());
+
+            // 解析扩展名
+            String name = file.getName();
+            if (name != null && name.contains(".")) {
+                int lastDot = name.lastIndexOf('.');
+                doc.setNamePure(name.substring(0, lastDot));
+                doc.setExtension(name.substring(lastDot + 1));
+            } else {
+                doc.setNamePure(name);
+                doc.setExtension(null);
+            }
+            // contentPreview 可后续异步填充
+        } else if (type == FileItemType.FOLDER) {
+            // 查询文件夹表
+            UserFolder folder = userFolderService.getOne(
+                    new LambdaQueryWrapper<UserFolder>()
+                            .eq(UserFolder::getId, id)
+                            .last("LIMIT 1")
+            );
+            if (folder == null) {
+                log.warn("文件夹不存在，id: {}", id);
+                return;
+            }
+            doc.setName(folder.getName());
+            doc.setParentId(folder.getParentId());
+            doc.setSize(0L);                     // 文件夹无大小
+            doc.setUserId(folder.getUserId());
+            doc.setUpdateTime(folder.getUpdateTime());
+
+            // 文件夹无扩展名，直接用名字作为 namePure
+            doc.setNamePure(folder.getName());
+            doc.setExtension(null);
+        } else {
+            throw new IllegalArgumentException("Unsupported type: " + type);
+        }
+
+        fileSearchRepository.addDocument(doc);
+        log.info("ES索引添加成功，id: {}, type: {}", id, type);
     }
 
     // ====== Read ======
@@ -84,41 +131,41 @@ public class FileManagerServiceImpl implements FileManagerService {
      * 根方法
      * 获取指定目录下的虚拟文件列表
      */
-        public List<VirtualFileVO> getVirtualFileList(Long parentId, Long userId) {
+    public List<VirtualFileVO> getVirtualFileList(Long parentId, Long userId) {
 
-            // 0. 获取用户根目录
-            if (parentId == null || parentId == 0L) {
-                UserFolder rootFolder = userFolderService.getOne(
-                        new LambdaQueryWrapper<UserFolder>()
-                                .eq(UserFolder::getUserId, userId)
-                                .eq(UserFolder::getParentId, 0L)
-                );
-                if (rootFolder == null) {
-                    return new ArrayList<>();
-                }
-                parentId = rootFolder.getId();
+        // 0. 获取用户根目录
+        if (parentId == null || parentId == 0L) {
+            UserFolder rootFolder = userFolderService.getOne(
+                    new LambdaQueryWrapper<UserFolder>()
+                            .eq(UserFolder::getUserId, userId)
+                            .eq(UserFolder::getParentId, 0L)
+            );
+            if (rootFolder == null) {
+                return new ArrayList<>();
             }
-            // 1.1. 构建文件夹查询条件
-            LambdaQueryWrapper<UserFolder> folderWrapper = new LambdaQueryWrapper<UserFolder>()
-                    .eq(UserFolder::getParentId, parentId)
-                    .isNull(UserFolder::getDeletedAt);
-            // 1.2. 构建文件查询条件
-            LambdaQueryWrapper<UserFile> fileWrapper = new LambdaQueryWrapper<UserFile>()
-                    .eq(UserFile::getParentId, parentId)
-                    .isNull(UserFile::getDeletedAt);
-            // 2. 如果传入用户名说明使用用户名鉴权
-            if (userId != null) {
-                folderWrapper.eq(UserFolder::getUserId, userId);
-                fileWrapper.eq(UserFile::getUserId, userId);
-            }
-
-            // 3. 查询
-            List<UserFolder> folders = userFolderService.list(folderWrapper);
-            List<UserFile> files = userFileService.list(fileWrapper);
-
-            // 4. 转换并排序返回
-            return mergeAndConvert(folders, files);
+            parentId = rootFolder.getId();
         }
+        // 1.1. 构建文件夹查询条件
+        LambdaQueryWrapper<UserFolder> folderWrapper = new LambdaQueryWrapper<UserFolder>()
+                .eq(UserFolder::getParentId, parentId)
+                .isNull(UserFolder::getDeletedAt);
+        // 1.2. 构建文件查询条件
+        LambdaQueryWrapper<UserFile> fileWrapper = new LambdaQueryWrapper<UserFile>()
+                .eq(UserFile::getParentId, parentId)
+                .isNull(UserFile::getDeletedAt);
+        // 2. 如果传入用户名说明使用用户名鉴权
+        if (userId != null) {
+            folderWrapper.eq(UserFolder::getUserId, userId);
+            fileWrapper.eq(UserFile::getUserId, userId);
+        }
+
+        // 3. 查询
+        List<UserFolder> folders = userFolderService.list(folderWrapper);
+        List<UserFile> files = userFileService.list(fileWrapper);
+
+        // 4. 转换并排序返回
+        return mergeAndConvert(folders, files);
+    }
 
     @Override
     public List<VirtualFileVO> getVirtualFolderListOnly(Long parentId, Long userId) {
@@ -168,10 +215,18 @@ public class FileManagerServiceImpl implements FileManagerService {
 
 
     @Override
-    public List<VirtualFileVO> search(String keyword, Long userId){
-        PageResult<FileDocument> pageResult = fileSearchRepository.searchFile(keyword, userId, null, null, null, null, 1, 10);
-        log.info("搜索引擎内数据为 {}", pageResult);
-        return null;
+    public PageResult<VirtualFileVO> search(String keyword, Long userId, Integer page, Integer size) {
+        int currentPage = (page == null || page < 1) ? 1 : page;
+        int pageSize = (size == null || size < 1) ? 10 : size;
+
+        // 1. 从 ES 查询
+        PageResult<FileDocument> pageResult = fileSearchRepository.searchFile(
+                keyword, userId, null, null, null, null, currentPage, pageSize
+        );
+        log.info("搜索引擎返回原始数据：{}", pageResult);
+
+        // 2. 一键转换并返回
+        return convertPage(pageResult);
     }
 
 
@@ -447,5 +502,30 @@ public class FileManagerServiceImpl implements FileManagerService {
         );
 
         return result;
+    }
+
+    private PageResult<VirtualFileVO> convertPage(PageResult<FileDocument> source) {
+        if (source == null) {
+            return new PageResult<>();
+        }
+
+        // 转换列表
+        List<VirtualFileVO> voList = source.getList().stream()
+                .map(this::convertToVO)   // 单个转换方法（见下面）
+                .collect(Collectors.toList());
+
+        // 复制分页信息
+        PageResult<VirtualFileVO> target = new PageResult<>();
+        BeanUtils.copyProperties(source, target);
+        target.setList(voList);
+
+        return target;
+    }
+
+    // 单个转换方法（可复用）
+    private VirtualFileVO convertToVO(FileDocument doc) {
+        VirtualFileVO vo = new VirtualFileVO();
+        BeanUtils.copyProperties(doc, vo);
+        return vo;
     }
 }

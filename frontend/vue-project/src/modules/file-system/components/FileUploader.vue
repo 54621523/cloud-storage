@@ -30,7 +30,7 @@ import { ElMessage } from 'element-plus'
 const UPLOADER_NAME = 'myUploader'
 
 import { FileUD, type Uploader, type UploadFile } from '@file-ud.js/core'
-import { initUpload, completeMultipartUpload } from '@/api/upload-v-2-controller'
+import { initUpload, completeMultipartUpload } from '@/api/分片上传'
 import { tr } from 'element-plus/es/locales.mjs';
 import { FILE_EXPLORER_KEY } from '@/constants/symbol';
 
@@ -59,6 +59,11 @@ function triggerInput(type: 'file' | 'folder') {
 const handleFileChange = (event: Event) => {
   const target = event.target as HTMLInputElement;
   const files = target.files;
+  console.log(`文件序列总观是 ${files}`)
+  console.log(`文件序列的item0是 ${files![0]!.webkitRelativePath}`)
+  console.log(`文件序列的item1是 ${files![1]!.webkitRelativePath}`)
+  console.log(`文件序列的item2是 ${files![2]!.webkitRelativePath}`)
+  console.log(`文件序列的item3是 ${files![3]!.webkitRelativePath}`)
   if (!files || files.length === 0) return;
 
   if (!uploader) {
@@ -68,7 +73,7 @@ const handleFileChange = (event: Event) => {
   }
 
   // 使用 addFiles 批量添加所有文件
-  (uploader as any).addFiles(files)
+  uploader.addFiles(files)
     .then(() => {
       // 如果库需要手动启动，则调用 start（根据实际情况选择）
       if (typeof (uploader as any).start === 'function') {
@@ -187,6 +192,7 @@ onMounted(() => {
       timeout: 10000,
       enableFileCache: true,
     },
+    multiple: true
   })
 
   if (!uploader) {
@@ -273,6 +279,7 @@ onMounted(() => {
 
     try {
       const response = await completeMultipartUpload(request)
+      refresh()
       return response
     } catch (error) {
       const err = error as Error
@@ -283,8 +290,6 @@ onMounted(() => {
   uploader.onSuccess = (file: UploadFile) => {
     refresh()
   }
-
-  uploader.addFiles
 
 })
 

@@ -24,4 +24,6 @@ public interface FilePhysicalService extends IService<FilePhysical> {
 
     
     void decreaseRef(Long... id);
+
+    Long getOrCreatePhysicalId(String md5, long size, String ossKey);
 }

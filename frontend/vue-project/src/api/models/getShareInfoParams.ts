@@ -6,6 +6,12 @@
  */
 
 export type GetShareInfoParams = {
+/**
+ * @minimum 0
+ */
 parentId: number;
+/**
+ * @minimum 0
+ */
 rootId: number;
 };

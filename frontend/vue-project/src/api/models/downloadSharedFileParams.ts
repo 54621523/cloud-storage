@@ -6,6 +6,12 @@
  */
 
 export type DownloadSharedFileParams = {
+/**
+ * @minimum 0
+ */
 id: number;
+/**
+ * @minimum 0
+ */
 rootId: number;
 };

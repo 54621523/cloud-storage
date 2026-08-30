@@ -7,10 +7,16 @@
 import type { ItemIdentity } from './itemIdentity';
 
 export interface TransferRequest {
-  /** 目标文件夹id（访问者视角下的文件列表） */
-  targetFolderId?: number;
+  /**
+     * 目标文件夹id（访问者视角下的文件列表）
+     * @minimum 0
+     */
+  targetFolderId: number;
   /** 待转存的文件/文件夹标识 */
-  items?: ItemIdentity[];
-  /** 源文件夹的顶级文件夹id（访问者视角下的文件列表） */
-  rootId?: number;
+  items: ItemIdentity[];
+  /**
+     * 源文件夹的顶级文件夹id（访问者视角下的文件列表）
+     * @minimum 0
+     */
+  rootId: number;
 }

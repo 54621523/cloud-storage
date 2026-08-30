@@ -2,6 +2,12 @@
 <!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
         "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
 <mapper namespace="demo.cloud.file.mapper.FilePhysicalMapper">
+    <insert id="insertOrUpdateAndGet" useGeneratedKeys="true" keyProperty="id">
+        INSERT INTO file_physical (md5, size, oss_key, create_time, update_time, ref_count)
+        VALUES (#{md5}, #{size}, #{ossKey}, #{createTime}, #{updateTime}, 1)
+        ON DUPLICATE KEY UPDATE ref_count   = ref_count + 1,
+                                update_time = #{updateTime}
+    </insert>
     <update id="batchIncrementRefCount">
         UPDATE file_physical SET ref_count = ref_count + 1 WHERE id IN
         <foreach collection="ids" item="id" open="(" separator="," close=")">

@@ -52,8 +52,8 @@ public class UploadV2Controller {
         log.info("用户 {} 合并分片，uploadId: {}, 分片数: {}",
                 userId, request.getUploadId(), request.getParts().size());
 
-        String result = uploadV2Service.completeMultipartUpload(request, userId);
-        return Result.success(result);
+        uploadV2Service.completeMultipartUpload(request, userId);
+        return Result.success();
     }
 
     // ==================== 2. 查询接口 ====================

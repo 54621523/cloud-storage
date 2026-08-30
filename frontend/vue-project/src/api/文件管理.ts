@@ -37,7 +37,8 @@ import type {
   RenameRequest,
   Result,
   ResultListVirtualFileVO,
-  Search1Params
+  ResultPageResultVirtualFileVO,
+  SearchParams
 } from './models';
 
 import { customInstance } from '../utils/matutor/custom-instance';
@@ -243,13 +244,17 @@ export const useCreateFolder = <TError = unknown,
       > => {
       return useMutation(getCreateFolderMutationOptions(options), queryClient);
     }
-    export const search1 = (
-    params: MaybeRefOrGetter<Search1Params>,
+    /**
+ * 根据关键词模糊搜索文件和文件夹，支持分页
+ * @summary 搜索文件/文件夹
+ */
+export const search = (
+    params: MaybeRefOrGetter<SearchParams>,
  options?: SecondParameter<typeof customInstance>,signal?: AbortSignal
 ) => {
       params = toValue(params);
 
-      return customInstance<ResultListVirtualFileVO>(
+      return customInstance<ResultPageResultVirtualFileVO>(
       {url: `/api/files/search`, method: 'GET',
         params, signal
     },
@@ -259,42 +264,45 @@ export const useCreateFolder = <TError = unknown,
 
 
 
-export const getSearch1QueryKey = (params?: MaybeRefOrGetter<Search1Params>,) => {
+export const getSearchQueryKey = (params?: MaybeRefOrGetter<SearchParams>,) => {
     return [
     'api','files','search', ...(params ? [params] : [])
     ] as const;
     }
 
 
-export const getSearch1QueryOptions = <TData = Awaited<ReturnType<typeof search1>>, TError = unknown>(params: MaybeRefOrGetter<Search1Params>, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof search1>>, TError, TData>>, request?: SecondParameter<typeof customInstance>}
+export const getSearchQueryOptions = <TData = Awaited<ReturnType<typeof search>>, TError = unknown>(params: MaybeRefOrGetter<SearchParams>, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof search>>, TError, TData>>, request?: SecondParameter<typeof customInstance>}
 ) => {
 
 const {query: queryOptions, request: requestOptions} = options ?? {};
 
-  const queryKey =  getSearch1QueryKey(params);
+  const queryKey =  getSearchQueryKey(params);
 
 
 
-    const queryFn: QueryFunction<Awaited<ReturnType<typeof search1>>> = ({ signal }) => search1(params, requestOptions, signal);
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof search>>> = ({ signal }) => search(params, requestOptions, signal);
 
 
 
 
 
-   return  { queryKey, queryFn, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof search1>>, TError, TData>
+   return  { queryKey, queryFn, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof search>>, TError, TData>
 }
 
-export type Search1QueryResult = NonNullable<Awaited<ReturnType<typeof search1>>>
-export type Search1QueryError = unknown
+export type SearchQueryResult = NonNullable<Awaited<ReturnType<typeof search>>>
+export type SearchQueryError = unknown
 
 
+/**
+ * @summary 搜索文件/文件夹
+ */
 
-export function useSearch1<TData = Awaited<ReturnType<typeof search1>>, TError = unknown>(
- params: MaybeRefOrGetter<Search1Params>, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof search1>>, TError, TData>>, request?: SecondParameter<typeof customInstance>}
+export function useSearch<TData = Awaited<ReturnType<typeof search>>, TError = unknown>(
+ params: MaybeRefOrGetter<SearchParams>, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof search>>, TError, TData>>, request?: SecondParameter<typeof customInstance>}
  , queryClient?: QueryClient
  ): UseQueryReturnType<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> } {
 
-  const queryOptions = getSearch1QueryOptions(params,options)
+  const queryOptions = getSearchQueryOptions(params,options)
 
   const query = useQuery(queryOptions, queryClient) as UseQueryReturnType<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> };
 

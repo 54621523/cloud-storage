@@ -46,6 +46,10 @@ type SecondParameter<T extends (...args: never) => unknown> = Parameters<T>[1];
 
 
 
+/**
+ * 所有分片上传完成后，调用此接口合并成完整文件
+ * @summary 合并分片
+ */
 export const completeMultipartUpload = (
     mergeRequestV2: MaybeRefOrGetter<MergeRequestV2>,
  options?: SecondParameter<typeof customInstance>,signal?: AbortSignal
@@ -94,7 +98,10 @@ const {mutation: mutationOptions, request: requestOptions} = options ?
     export type CompleteMultipartUploadMutationBody = MergeRequestV2
     export type CompleteMultipartUploadMutationError = unknown
 
-    export const useCompleteMultipartUpload = <TError = unknown,
+    /**
+ * @summary 合并分片
+ */
+export const useCompleteMultipartUpload = <TError = unknown,
     TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof completeMultipartUpload>>, TError,{data: MergeRequestV2}, TContext>, request?: SecondParameter<typeof customInstance>}
  , queryClient?: QueryClient): UseMutationReturnType<
         Awaited<ReturnType<typeof completeMultipartUpload>>,
@@ -104,7 +111,11 @@ const {mutation: mutationOptions, request: requestOptions} = options ?
       > => {
       return useMutation(getCompleteMultipartUploadMutationOptions(options), queryClient);
     }
-    export const initUpload = (
+    /**
+ * 创建分片上传会话，返回uploadId和预签名URL列表
+ * @summary 初始化分片上传
+ */
+export const initUpload = (
     initRequestV2: MaybeRefOrGetter<InitRequestV2>,
  options?: SecondParameter<typeof customInstance>,signal?: AbortSignal
 ) => {
@@ -152,7 +163,10 @@ const {mutation: mutationOptions, request: requestOptions} = options ?
     export type InitUploadMutationBody = InitRequestV2
     export type InitUploadMutationError = unknown
 
-    export const useInitUpload = <TError = unknown,
+    /**
+ * @summary 初始化分片上传
+ */
+export const useInitUpload = <TError = unknown,
     TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof initUpload>>, TError,{data: InitRequestV2}, TContext>, request?: SecondParameter<typeof customInstance>}
  , queryClient?: QueryClient): UseMutationReturnType<
         Awaited<ReturnType<typeof initUpload>>,
@@ -162,14 +176,18 @@ const {mutation: mutationOptions, request: requestOptions} = options ?
       > => {
       return useMutation(getInitUploadMutationOptions(options), queryClient);
     }
-    export const listParts = (
+    /**
+ * 根据uploadId查询已上传的分片列表，用于断点续传
+ * @summary 查询已上传分片
+ */
+export const listParts = (
     params: MaybeRefOrGetter<ListPartsParams>,
  options?: SecondParameter<typeof customInstance>,signal?: AbortSignal
 ) => {
       params = toValue(params);
 
       return customInstance<ResultListPartInfo>(
-      {url: `/api/v2/storage/listParts`, method: 'GET',
+      {url: `/api/v2/storage/list-parts`, method: 'GET',
         params, signal
     },
       options);
@@ -180,7 +198,7 @@ const {mutation: mutationOptions, request: requestOptions} = options ?
 
 export const getListPartsQueryKey = (params?: MaybeRefOrGetter<ListPartsParams>,) => {
     return [
-    'api','v2','storage','listParts', ...(params ? [params] : [])
+    'api','v2','storage','list-parts', ...(params ? [params] : [])
     ] as const;
     }
 
@@ -207,6 +225,9 @@ export type ListPartsQueryResult = NonNullable<Awaited<ReturnType<typeof listPar
 export type ListPartsQueryError = unknown
 
 
+/**
+ * @summary 查询已上传分片
+ */
 
 export function useListParts<TData = Awaited<ReturnType<typeof listParts>>, TError = unknown>(
  params: MaybeRefOrGetter<ListPartsParams>, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof listParts>>, TError, TData>>, request?: SecondParameter<typeof customInstance>}
@@ -227,6 +248,10 @@ export function useListParts<TData = Awaited<ReturnType<typeof listParts>>, TErr
 
 
 
+/**
+ * 为指定文件生成有时效性的预签名下载URL
+ * @summary 生成下载链接
+ */
 export const generateDownloadUrl = (
     params: MaybeRefOrGetter<GenerateDownloadUrlParams>,
  options?: SecondParameter<typeof customInstance>,signal?: AbortSignal
@@ -234,7 +259,7 @@ export const generateDownloadUrl = (
       params = toValue(params);
 
       return customInstance<ResultString>(
-      {url: `/api/v2/storage/Download`, method: 'GET',
+      {url: `/api/v2/storage/download`, method: 'GET',
         params, signal
     },
       options);
@@ -245,7 +270,7 @@ export const generateDownloadUrl = (
 
 export const getGenerateDownloadUrlQueryKey = (params?: MaybeRefOrGetter<GenerateDownloadUrlParams>,) => {
     return [
-    'api','v2','storage','Download', ...(params ? [params] : [])
+    'api','v2','storage','download', ...(params ? [params] : [])
     ] as const;
     }
 
@@ -272,6 +297,9 @@ export type GenerateDownloadUrlQueryResult = NonNullable<Awaited<ReturnType<type
 export type GenerateDownloadUrlQueryError = unknown
 
 
+/**
+ * @summary 生成下载链接
+ */
 
 export function useGenerateDownloadUrl<TData = Awaited<ReturnType<typeof generateDownloadUrl>>, TError = unknown>(
  params: MaybeRefOrGetter<GenerateDownloadUrlParams>, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof generateDownloadUrl>>, TError, TData>>, request?: SecondParameter<typeof customInstance>}

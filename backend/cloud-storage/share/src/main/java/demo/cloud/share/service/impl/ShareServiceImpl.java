@@ -27,6 +27,7 @@ import demo.cloud.share.service.ShareService;
 import lombok.extern.slf4j.Slf4j;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.dubbo.config.annotation.DubboReference;
+import org.apache.seata.spring.annotation.GlobalTransactional;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.data.redis.core.RedisTemplate;
 import org.springframework.security.crypto.password.PasswordEncoder;
@@ -227,6 +228,7 @@ public class ShareServiceImpl extends ServiceImpl<ShareLinkMapper, ShareLink> im
     // ========================================
 
     @Override
+    @GlobalTransactional(rollbackFor = Exception.class, name = "saveToMyDisk")
     public void saveToMyDisk(String shareToken, Long userId, TransferRequest request) {
         // 1. 验证目标文件夹是否属于该用户
         if (!userFolderDubboService.isOwner(request.getTargetFolderId(), userId)) {

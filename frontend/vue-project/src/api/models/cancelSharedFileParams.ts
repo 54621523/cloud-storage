@@ -6,5 +6,8 @@
  */
 
 export type CancelSharedFileParams = {
+/**
+ * @minimum 0
+ */
 shareId: number;
 };

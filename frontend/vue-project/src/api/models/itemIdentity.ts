@@ -10,7 +10,10 @@ import type { FileItemType } from './fileItemType';
  * 简易对象实体
  */
 export interface ItemIdentity {
-  /** 文件/文件夹ID */
-  id?: number;
-  type?: FileItemType;
+  /**
+     * 文件/文件夹ID
+     * @minimum 1
+     */
+  id: number;
+  type: FileItemType;
 }

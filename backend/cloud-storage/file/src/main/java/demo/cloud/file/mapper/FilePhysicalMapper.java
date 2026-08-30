@@ -4,10 +4,7 @@ package demo.cloud.file.mapper;
 import com.baomidou.mybatisplus.core.mapper.BaseMapper;
 import com.github.yulichang.base.MPJBaseMapper;
 import demo.cloud.file.pojo.FilePhysical;
-import org.apache.ibatis.annotations.Mapper;
-import org.apache.ibatis.annotations.Param;
-import org.apache.ibatis.annotations.Select;
-import org.apache.ibatis.annotations.Update;
+import org.apache.ibatis.annotations.*;
 
 import java.util.Collection;
 import java.util.List;
@@ -31,4 +28,6 @@ public interface FilePhysicalMapper extends BaseMapper<FilePhysical>, MPJBaseMap
      */
     @Update("DELETE FROM file_physical WHERE id = #{id} AND ref_count = 0")
     int deleteByIdIfZeroRef(@Param("id") Long id);
+
+    Long insertOrUpdateAndGet(FilePhysical physical);
 }

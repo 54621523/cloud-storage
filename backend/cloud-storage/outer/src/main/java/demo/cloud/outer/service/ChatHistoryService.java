@@ -2,8 +2,6 @@ package demo.cloud.outer.service;
 
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.baomidou.mybatisplus.core.conditions.update.LambdaUpdateWrapper;
-import com.github.yulichang.toolkit.JoinWrappers;
-import com.github.yulichang.wrapper.MPJLambdaWrapper;
 import demo.cloud.common.exception.BusinessException;
 import demo.cloud.common.pojo.CursorPageResult;
 import demo.cloud.outer.mapper.ChatMessageMapper;
@@ -93,13 +91,28 @@ public class ChatHistoryService {
      */
     @Transactional(rollbackFor = Exception.class)
     public void deleteSession(String sessionId, Long userId) {
-        // TODO 存在bug
-        log.info("删除会话及其消息, sessionId: {}", sessionId);
-        MPJLambdaWrapper<ChatSession> wrapper = JoinWrappers.lambda(ChatSession.class)
-                .leftJoin(ChatMessage.class, ChatMessage::getSessionId, ChatSession::getSessionId)
-                .eq(ChatSession::getUserId, userId)
-                .eq(ChatSession::getSessionId, sessionId);
-        chatSessionMapper.deleteJoin(wrapper);
+        log.info("删除会话及其消息, sessionId: {}, userId: {}", sessionId, userId);
+
+        // 1. 查询会话是否存在且属于该用户（同时加载出来，用于后续判断）
+        ChatSession session = chatSessionMapper.selectOne(
+                new LambdaQueryWrapper<ChatSession>()
+                        .eq(ChatSession::getSessionId, sessionId)
+                        .eq(ChatSession::getUserId, userId)
+        );
+        if (session == null) {
+            throw new BusinessException(0,"会话不存在或无权限");
+        }
+
+        // 2. 删除该会话下的所有消息（物理删除或逻辑删除，根据业务）
+        chatMessageMapper.delete(
+                new LambdaQueryWrapper<ChatMessage>()
+                        .eq(ChatMessage::getSessionId, sessionId)
+        );
+
+        // 3. 删除会话本身
+        chatSessionMapper.deleteById(session.getId()); // 或使用 sessionId 条件删除
+
+        log.info("删除成功, sessionId: {}", sessionId);
     }
 
     public CursorPageResult<ChatSession> listSessions(Long userId, String cursor) {

@@ -2,7 +2,6 @@ package demo.cloud.file.dto.uploadv2;
 
 
 import io.swagger.v3.oas.annotations.media.Schema;
-import jakarta.annotation.Nullable;
 import jakarta.validation.constraints.NotNull;
 import lombok.Data;
 
@@ -41,7 +40,9 @@ public class InitRequestV2 {
 
     private Long parentId;
 
-    @Nullable
+    @Schema(
+            nullable = true
+    )
     private String relativePath;
 
     private Long totalChunks;

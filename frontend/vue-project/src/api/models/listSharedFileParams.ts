@@ -8,10 +8,12 @@
 export type ListSharedFileParams = {
 /**
  * 页码
+ * @minimum 0
  */
 pageNum: number;
 /**
  * 页大小
+ * @minimum 0
  */
 pageSize: number;
 };

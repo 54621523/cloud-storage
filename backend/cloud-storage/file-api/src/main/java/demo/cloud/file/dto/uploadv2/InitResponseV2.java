@@ -1,14 +1,15 @@
 package demo.cloud.file.dto.uploadv2;
 
 
-import lombok.Data;
-import lombok.NoArgsConstructor;
+import lombok.*;
 
 import java.util.List;
 import java.util.Set;
 
 @Data
 @NoArgsConstructor
+@Builder
+@AllArgsConstructor
 public class InitResponseV2 {
 
     String uploadId;

@@ -6,7 +6,16 @@
  */
 
 export type ListPartsParams = {
+/**
+ * 存储桶名称
+ */
 bucket: string;
+/**
+ * 文件在存储桶中的完整路径
+ */
 key: string;
+/**
+ * 分片上传ID
+ */
 uploadId: string;
 };

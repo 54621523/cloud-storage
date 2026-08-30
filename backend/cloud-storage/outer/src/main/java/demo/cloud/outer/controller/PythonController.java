@@ -62,7 +62,6 @@ public class PythonController {
             log.warn("文件不存在: userId={}, userFileId={}", userId, request.getId());
             return Result.error("文件不存在或已被删除");
         }
-        // TODO bucket写入库，做动态bucket
 
         DocumentMetadata metadata = DocumentMetadata.builder()
                 .docId(filePhysical.getId())

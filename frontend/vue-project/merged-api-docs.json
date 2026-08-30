@@ -20,8 +20,8 @@
       "description": "包含回收站内的浏览、还原、彻底删除等操作"
     },
     {
-      "name": "test",
-      "description": "包含文件/文件夹的浏览、创建、删除等操作"
+      "name": "分片上传",
+      "description": "包含大文件分片上传的初始化、合并、查询等操作"
     },
     {
       "name": "分享模块",
@@ -40,8 +40,10 @@
     "/api/v2/storage/merge": {
       "post": {
         "tags": [
-          "upload-v-2-controller"
+          "分片上传"
         ],
+        "summary": "合并分片",
+        "description": "所有分片上传完成后，调用此接口合并成完整文件",
         "operationId": "completeMultipartUpload",
         "requestBody": {
           "content": {
@@ -70,8 +72,10 @@
     "/api/v2/storage/init": {
       "post": {
         "tags": [
-          "upload-v-2-controller"
+          "分片上传"
         ],
+        "summary": "初始化分片上传",
+        "description": "创建分片上传会话，返回uploadId和预签名URL列表",
         "operationId": "initUpload",
         "requestBody": {
           "content": {
@@ -225,36 +229,44 @@
         }
       }
     },
-    "/api/v2/storage/listParts": {
+    "/api/v2/storage/list-parts": {
       "get": {
         "tags": [
-          "upload-v-2-controller"
+          "分片上传"
         ],
+        "summary": "查询已上传分片",
+        "description": "根据uploadId查询已上传的分片列表，用于断点续传",
         "operationId": "listParts",
         "parameters": [
           {
             "name": "bucket",
             "in": "query",
+            "description": "存储桶名称",
             "required": true,
             "schema": {
               "type": "string"
-            }
+            },
+            "example": "documents"
           },
           {
             "name": "key",
             "in": "query",
+            "description": "文件在存储桶中的完整路径",
             "required": true,
             "schema": {
               "type": "string"
-            }
+            },
+            "example": "files/2026/08/29/xxx.txt"
           },
           {
             "name": "uploadId",
             "in": "query",
+            "description": "分片上传ID",
             "required": true,
             "schema": {
               "type": "string"
-            }
+            },
+            "example": 12345
           }
         ],
         "responses": {
@@ -271,21 +283,25 @@
         }
       }
     },
-    "/api/v2/storage/Download": {
+    "/api/v2/storage/download": {
       "get": {
         "tags": [
-          "upload-v-2-controller"
+          "分片上传"
         ],
+        "summary": "生成下载链接",
+        "description": "为指定文件生成有时效性的预签名下载URL",
         "operationId": "generateDownloadUrl",
         "parameters": [
           {
             "name": "virtualFileId",
             "in": "query",
+            "description": "虚拟文件ID",
             "required": true,
             "schema": {
               "type": "integer",
               "format": "int64"
-            }
+            },
+            "example": 1001
           }
         ],
         "responses": {
@@ -295,67 +311,6 @@
               "application/json": {
                 "schema": {
                   "$ref": "#/components/schemas/ResultString"
-                }
-              }
-            }
-          }
-        }
-      }
-    },
-    "/api/test/search": {
-      "get": {
-        "tags": [
-          "test"
-        ],
-        "operationId": "search",
-        "parameters": [
-          {
-            "name": "keyword",
-            "in": "query",
-            "required": true,
-            "schema": {
-              "type": "string"
-            }
-          }
-        ],
-        "responses": {
-          "200": {
-            "description": "OK",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/Result"
-                }
-              }
-            }
-          }
-        }
-      }
-    },
-    "/api/test/put": {
-      "get": {
-        "tags": [
-          "test"
-        ],
-        "operationId": "put",
-        "parameters": [
-          {
-            "name": "id",
-            "in": "query",
-            "required": true,
-            "schema": {
-              "type": "integer",
-              "format": "int64"
-            }
-          }
-        ],
-        "responses": {
-          "200": {
-            "description": "OK",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/Result"
                 }
               }
             }
@@ -414,14 +369,36 @@
         "tags": [
           "文件管理"
         ],
-        "operationId": "search_1",
+        "summary": "搜索文件/文件夹",
+        "description": "根据关键词模糊搜索文件和文件夹，支持分页",
+        "operationId": "search",
         "parameters": [
           {
-            "name": "searchName",
+            "name": "keyword",
             "in": "query",
             "required": true,
             "schema": {
               "type": "string"
+            }
+          },
+          {
+            "name": "page",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "format": "int32",
+              "default": 1
+            }
+          },
+          {
+            "name": "size",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "format": "int32",
+              "default": 10
             }
           }
         ],
@@ -431,7 +408,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/ResultListVirtualFileVO"
+                  "$ref": "#/components/schemas/ResultPageResultVirtualFileVO"
                 }
               }
             }
@@ -722,6 +699,7 @@
             "description": "页码",
             "required": true,
             "schema": {
+              "minimum": 0,
               "type": "integer",
               "format": "int64"
             },
@@ -733,6 +711,7 @@
             "description": "页大小",
             "required": true,
             "schema": {
+              "minimum": 0,
               "type": "integer",
               "format": "int64"
             },
@@ -775,6 +754,7 @@
             "in": "query",
             "required": true,
             "schema": {
+              "minimum": 0,
               "type": "integer",
               "format": "int64"
             }
@@ -784,6 +764,7 @@
             "in": "query",
             "required": true,
             "schema": {
+              "minimum": 0,
               "type": "integer",
               "format": "int64"
             }
@@ -825,6 +806,7 @@
             "in": "query",
             "required": true,
             "schema": {
+              "minimum": 0,
               "type": "integer",
               "format": "int64"
             }
@@ -834,6 +816,7 @@
             "in": "query",
             "required": true,
             "schema": {
+              "minimum": 0,
               "type": "integer",
               "format": "int64"
             }
@@ -867,6 +850,7 @@
             "in": "query",
             "required": true,
             "schema": {
+              "minimum": 0,
               "type": "integer",
               "format": "int64"
             }
@@ -894,6 +878,38 @@
         "summary": "AI对话",
         "description": "流式输出并输出引用文档",
         "operationId": "streamChat",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ChatRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "text/event-stream": {
+                "schema": {
+                  "$ref": "#/components/schemas/SseEmitter"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/ai/stream/chat/mock": {
+      "post": {
+        "tags": [
+          "AI应用"
+        ],
+        "summary": "模拟AI对话（测试）",
+        "description": "用于测试 SSE 流，不实际调用 Python 服务",
+        "operationId": "mockStreamChat",
         "requestBody": {
           "content": {
             "application/json": {
@@ -1200,7 +1216,8 @@
             "format": "int64"
           },
           "relativePath": {
-            "type": "string"
+            "type": "string",
+            "nullable": true
           },
           "totalChunks": {
             "type": "integer",
@@ -1275,9 +1292,14 @@
         ]
       },
       "ItemIdentity": {
+        "required": [
+          "id",
+          "type"
+        ],
         "type": "object",
         "properties": {
           "id": {
+            "minimum": 1,
             "type": "integer",
             "description": "文件/文件夹ID",
             "format": "int64",
@@ -1527,7 +1549,35 @@
         },
         "description": "通用响应对象"
       },
-      "ResultListVirtualFileVO": {
+      "PageResultVirtualFileVO": {
+        "type": "object",
+        "properties": {
+          "total": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "pages": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "current": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "size": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "list": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/VirtualFileVO"
+            }
+          }
+        },
+        "description": "响应数据"
+      },
+      "ResultPageResultVirtualFileVO": {
         "required": [
           "data"
         ],
@@ -1545,11 +1595,7 @@
             "example": "操作成功"
           },
           "data": {
-            "type": "array",
-            "description": "响应数据",
-            "items": {
-              "$ref": "#/components/schemas/VirtualFileVO"
-            }
+            "$ref": "#/components/schemas/PageResultVirtualFileVO"
           }
         },
         "description": "通用响应对象"
@@ -1591,6 +1637,33 @@
         },
         "description": "用于前端展示的视图对象"
       },
+      "ResultListVirtualFileVO": {
+        "required": [
+          "data"
+        ],
+        "type": "object",
+        "properties": {
+          "code": {
+            "type": "integer",
+            "description": "响应状态码，1表示成功",
+            "format": "int32",
+            "example": 1
+          },
+          "msg": {
+            "type": "string",
+            "description": "响应消息",
+            "example": "操作成功"
+          },
+          "data": {
+            "type": "array",
+            "description": "响应数据",
+            "items": {
+              "$ref": "#/components/schemas/VirtualFileVO"
+            }
+          }
+        },
+        "description": "通用响应对象"
+      },
       "DeleteRequest": {
         "type": "object",
         "properties": {
@@ -1615,9 +1688,14 @@
         "description": "批量删除请求体"
       },
       "CreateShareRequest": {
+        "required": [
+          "items"
+        ],
         "type": "object",
         "properties": {
           "password": {
+            "maxLength": 4,
+            "minLength": 4,
             "type": "string",
             "description": "提取码",
             "example": "abcde"
@@ -1628,6 +1706,8 @@
             "format": "date-time"
           },
           "displayName": {
+            "maxLength": 255,
+            "minLength": 0,
             "type": "string"
           },
           "items": {
@@ -1731,9 +1811,15 @@
         "description": "通用响应对象"
       },
       "TransferRequest": {
+        "required": [
+          "items",
+          "rootId",
+          "targetFolderId"
+        ],
         "type": "object",
         "properties": {
           "targetFolderId": {
+            "minimum": 0,
             "type": "integer",
             "description": "目标文件夹id（访问者视角下的文件列表）",
             "format": "int64",
@@ -1757,6 +1843,7 @@
             }
           },
           "rootId": {
+            "minimum": 0,
             "type": "integer",
             "description": "源文件夹的顶级文件夹id（访问者视角下的文件列表）",
             "format": "int64",
@@ -2050,8 +2137,6 @@
             "example": "aaabbbccc"
           },
           "email": {
-            "maxLength": 50,
-            "minLength": 0,
             "type": "string",
             "description": "邮箱",
             "example": "example@ex.com"

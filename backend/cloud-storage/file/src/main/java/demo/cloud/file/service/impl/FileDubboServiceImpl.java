@@ -90,7 +90,6 @@ public class FileDubboServiceImpl implements FileDubboService {
         Map<String, Object> result = userFileService.selectJoinMap(wrapper);
 
         if(result== null){
-            // TODO
             return "";
         }
         String displayName = (String) result.get("displayName");

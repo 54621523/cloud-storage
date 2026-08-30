@@ -29,7 +29,6 @@ public class UserService implements UserDetailsService {
         );
 
         if(user == null){
-            //TODO 字符串硬编码修改为枚举
             throw new UsernameNotFoundException("账号或密码错误");
         }
         return user;

@@ -65,7 +65,7 @@ import { ElMessage } from 'element-plus'
 import { FileUD, type Uploader, type Downloader, type UploadFile } from '@file-ud.js/core'
 
 
-import { initUpload, completeMultipartUpload, generateDownloadUrl } from '@/api/upload-v-2-service'
+import { initUpload, completeMultipartUpload, generateDownloadUrl } from '@/api/分片上传'
 import SparkMD5 from 'spark-md5'
 
 // ---------- 类型定义 ----------
@@ -370,8 +370,8 @@ onMounted(() => {
             const url = await response;
 
             urlCacheMap.set(cacheKey, {
-                url: url,
-                expiresAt: getExpiryFromUrl(url)
+                url: url.data,
+                expiresAt: getExpiryFromUrl(url.data)
             });
             return url;
         },

@@ -2,6 +2,7 @@ package demo.cloud.file.service;
 
 
 import demo.cloud.common.pojo.PageResult;
+import demo.cloud.file.constant.FileItemType;
 import demo.cloud.file.dto.*;
 
 import java.util.List;
@@ -15,7 +16,7 @@ public interface FileManagerService {
     // ====== Create ======
     void createFolder(CreateFolderRequest request, Long userId);
 
-    void addDocument(Long id);
+    void addDocument(Long id, FileItemType type);
 
 
     // ====== Read ======
@@ -27,7 +28,7 @@ public interface FileManagerService {
 
     PageResult<RecycleFileVO> queryMyRecycleBin(Long pageNum, Long pageSize, Long userId);
 
-    List<VirtualFileVO> search(String keyword, Long userId);
+    PageResult<VirtualFileVO> search(String keyword, Long userId, Integer page, Integer size);
 
     // ====== Update ======
 
