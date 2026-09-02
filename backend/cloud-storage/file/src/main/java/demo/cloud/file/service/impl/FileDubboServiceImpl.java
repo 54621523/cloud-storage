@@ -11,10 +11,7 @@ import demo.cloud.file.dto.VirtualFileVO;
 import demo.cloud.file.pojo.FilePhysical;
 import demo.cloud.file.pojo.UserFile;
 import demo.cloud.file.pojo.UserFolder;
-import demo.cloud.file.service.FileDubboService;
-import demo.cloud.file.service.FileManagerService;
-import demo.cloud.file.service.FilePhysicalService;
-import demo.cloud.file.service.UserFileService;
+import demo.cloud.file.service.*;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.apache.dubbo.config.annotation.DubboService;
@@ -46,7 +43,7 @@ public class FileDubboServiceImpl implements FileDubboService {
     private final FileManagerService fileManagerService;
 
     private final UserFileService userFileService;
-    private final FolderService userFolderService;
+    private final UserFolderService userFolderService;
     private final FilePhysicalService filePhysicalService;
 
     private final S3Presigner s3Presigner;
@@ -54,17 +51,6 @@ public class FileDubboServiceImpl implements FileDubboService {
 
     @Override
     public FilePhysicalDTO getPhysicalFileByUserIdAndUserFileId(Long userFileId, Long userId) {
-//        UserFile one = userFileService.getOne(
-//                new LambdaQueryWrapper<UserFile>()
-//                        .eq(UserFile::getId, userFileId)
-//                        .eq(UserFile::getUserId, userId));
-//        FilePhysical one1 = filePhysicalService.getOne(
-//                new LambdaQueryWrapper<FilePhysical>()
-//                        .eq(FilePhysical::getId, one.getPhysicalId())
-//                        .select(FilePhysical::getOssKey)
-//                        .select(FilePhysical::getId));
-//        FilePhysicalDTO filePhysicalDTO = new FilePhysicalDTO();
-//        BeanUtils.copyProperties(one1,dto);
         MPJLambdaWrapper<UserFile> wrapper = JoinWrappers.lambda(UserFile.class)
                 .select(FilePhysical::getId)
                 .select(FilePhysical::getOssKey)
@@ -164,6 +150,7 @@ public class FileDubboServiceImpl implements FileDubboService {
     @Override
     @Transactional(rollbackFor = Exception.class)
     public void copyBatch(List<ItemIdentity> validItems, Long userId, Long targetFolderId) {
+        // TODO 缓存失效
         long methodStart = System.currentTimeMillis();
         log.info("========== copyBatch 开始 ========== validItems数量: {}, userId: {}, targetFolderId: {}",
                 validItems == null ? 0 : validItems.size(), userId, targetFolderId);
@@ -414,7 +401,6 @@ public class FileDubboServiceImpl implements FileDubboService {
         int dotIndex = originalName.lastIndexOf(".");
         String baseName = (dotIndex == -1) ? originalName : originalName.substring(0, dotIndex);
         String extension = (dotIndex == -1) ? "" : originalName.substring(dotIndex);
-        // 格式化为毫秒级时间戳，确保同一毫秒内重试也能区分
         String timestamp = LocalDateTime.now().format(DateTimeFormatter.ofPattern("yyyyMMdd_HHmmss_SSS"));
         return baseName + "_" + timestamp + extension;
     }

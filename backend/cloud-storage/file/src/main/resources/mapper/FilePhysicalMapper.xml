@@ -8,6 +8,8 @@
         ON DUPLICATE KEY UPDATE ref_count   = ref_count + 1,
                                 update_time = #{updateTime}
     </insert>
+
+
     <update id="batchIncrementRefCount">
         UPDATE file_physical SET ref_count = ref_count + 1 WHERE id IN
         <foreach collection="ids" item="id" open="(" separator="," close=")">
@@ -20,4 +22,12 @@
             #{id}
         </foreach>
     </update>
+    <update id="decreaseRefCountByMap">
+        UPDATE file_physical
+        SET ref_count = ref_count - #{decrement}
+        WHERE id = #{id}
+          AND ref_count >= #{decrement}
+    </update>
+
+
 </mapper>

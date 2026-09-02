@@ -25,4 +25,9 @@ public class RenameRequest {
     )
     private FileItemType type;
 
+    @Schema(description = "父目录Id",
+        example = "1001"
+    )
+    private Long parentId;
+
 }

@@ -4,7 +4,10 @@ package demo.cloud.file.mapper;
 import com.baomidou.mybatisplus.core.mapper.BaseMapper;
 import com.github.yulichang.base.MPJBaseMapper;
 import demo.cloud.file.pojo.FilePhysical;
-import org.apache.ibatis.annotations.*;
+import org.apache.ibatis.annotations.Mapper;
+import org.apache.ibatis.annotations.Param;
+import org.apache.ibatis.annotations.Select;
+import org.apache.ibatis.annotations.Update;
 
 import java.util.Collection;
 import java.util.List;
@@ -16,6 +19,8 @@ public interface FilePhysicalMapper extends BaseMapper<FilePhysical>, MPJBaseMap
     int batchIncrementRefCount(@Param("ids") Collection<Long> ids);
 
     int batchDecrementRefCount(@Param("ids") Collection<Long> ids);
+
+    int decreaseRefCountByMap(@Param("id") Long id, Long decrement);
 
     /**
      * 查询引用计数为0且创建时间超过指定天数的物理文件

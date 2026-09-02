@@ -11,13 +11,14 @@ from typing import Annotated, Optional, List
 from structlog.contextvars import bind_contextvars, clear_contextvars
 from pydantic import BaseModel
 from RAG.core.llm_lifespan import get_llm
-from RAG.core.redis_lifespan import get_redis_checkpointer
+from RAG.core.redis_lifespan import get_checkpointer
 from RAG.core.vectorstore.MeilisearchVectorStore import get_vectorstore
 from langgraph.checkpoint.memory import InMemorySaver
 from RAG.RagAgent import build_agent_graph
 from RAG.Logging import logger
 import uuid
-router = APIRouter(tags=["Ai"])
+from sse_starlette import EventSourceResponse, ServerSentEvent, JSONServerSentEvent
+router = APIRouter(prefix="/ai")
 
 class ChatRequest(BaseModel):
     session_id: str
@@ -40,7 +41,7 @@ async def chat_endpoint(
     request: ChatRequest,
     llm: Annotated[ChatOpenAI, Depends(get_llm)],
     vectorstore: Annotated[VectorStore, Depends(get_vectorstore)],
-    checkpointer: Annotated[BaseCheckpointSaver, Depends(get_redis_checkpointer)],
+    checkpointer: Annotated[BaseCheckpointSaver, Depends(get_checkpointer)],
 ):
     trace_id = str(uuid.uuid4())
     session_id = request.session_id
@@ -57,7 +58,7 @@ async def chat_endpoint(
             generator = real_event_generator(request, llm, vectorstore, checkpointer)
     finally:
         clear_contextvars()
-    return StreamingResponse(generator, media_type="text/event-stream")
+    return EventSourceResponse(generator)
 
 async def real_event_generator(
     request: ChatRequest,
@@ -145,19 +146,19 @@ async def mock_event_generator(request: ChatRequest):
     chunk_size = 3  # 每块3个字符
     for i in range(0, len(mock_answer), chunk_size):
         chunk = mock_answer[i:i+chunk_size]
-        yield format_sse(data={"content": chunk}, event="stream_chunk")
+        yield {"data": json.dumps({"content": chunk}), "event": "stream_chunk"}
         await asyncio.sleep(0.05)  # 模拟延迟
 
     # 3. 模拟 references
-    yield format_sse(
-        data={"data": [{"filename": "test.pdf", "page_number": 1, "text": "示例引用"}]},
-        event="references"
-    )
+    yield {
+        "data": json.dumps({"data": [{"filename": "test.pdf", "page_number": 1, "text": "示例引用"}]}),
+        "event": "references"
+    }
     await asyncio.sleep(0.1)
 
     # 4. 发送 final_answer（完整答案）
-    yield format_sse(data={"content": mock_answer}, event="final_answer")
+    yield {"data": json.dumps({"content": mock_answer}), "event": "final_answer"}
     await asyncio.sleep(0.1)
 
     # 5. 发送 done（结束标记）
-    yield format_sse(data={}, event="done")
+    yield {"data": "{}", "event": "done"}

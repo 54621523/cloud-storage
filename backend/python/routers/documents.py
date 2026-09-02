@@ -5,7 +5,7 @@ import logging
 from typing import Annotated, Optional, Any
 from RAG.core import RAGIngestionService,get_rag_service
 
-router = APIRouter(tags=["Documents"])
+router = APIRouter(prefix="/documents")
 
 logger = logging.getLogger(__name__)
 

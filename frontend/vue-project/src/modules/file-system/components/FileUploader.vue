@@ -21,6 +21,48 @@
     <input ref="folderInput" type="file" webkitdirectory directory multiple style="display: none;"
       @change="handleFileChange" />
   </div>
+
+
+  <!-- 浮动进度面板（使用 Teleport 挂载到 body） -->
+  <Teleport to="body">
+    <div v-if="showProgressPanel" class="progress-floating-panel">
+
+      <!-- 面板主体 -->
+      <div class="progress-card">
+        <!-- 关闭按钮 -->
+        <button class="close-btn" @click="closeProgressPanel">✕</button>
+
+        <!-- 整体进度条 -->
+        <div class="progress-row">
+          <span class="progress-label">上传进度</span>
+          <el-progress :percentage="totalProgress" :status="totalProgress === 100 ? 'success' : undefined"
+            :stroke-width="8" />
+        </div>
+
+        <!-- 统计信息 -->
+        <div class="stats-row">
+          <span>文件：{{ completedFilesCount }} / {{ totalFilesCount }}</span>
+          <span v-if="totalProgress === 100">✅ 完成</span>
+          <span v-else>⏳ 上传中...</span>
+        </div>
+
+        <!-- 文件状态列表（滚动） -->
+        <div class="file-status-list" v-if="fileStatuses.length">
+          <div v-for="item in fileStatuses.slice(0, 8)" :key="item.name" class="file-status-item">
+            <span class="file-name">{{ item.name }}</span>
+            <span class="file-status" :class="item.status">
+              {{ item.status === 'success' ? '✓' : item.status === 'error' ? '✗' : '⏳' }}
+              {{ item.status === 'uploading' ? `${item.percent}%` : '' }}
+            </span>
+          </div>
+          <div v-if="fileStatuses.length > 8" class="more-hint">
+            还有 {{ fileStatuses.length - 8 }} 个文件...
+          </div>
+        </div>
+      </div>
+    </div>
+  </Teleport>
+
 </template>
 
 <script setup lang="ts">
@@ -29,10 +71,11 @@ import SparkMD5 from 'spark-md5'
 import { ElMessage } from 'element-plus'
 const UPLOADER_NAME = 'myUploader'
 
-import { FileUD, type Uploader, type UploadFile } from '@file-ud.js/core'
+import { FileUD, UploadFile, type Uploader } from '@file-ud.js/core'
 import { initUpload, completeMultipartUpload } from '@/api/分片上传'
 import { tr } from 'element-plus/es/locales.mjs';
 import { FILE_EXPLORER_KEY } from '@/constants/symbol';
+import { AsyncCompiler } from 'sass';
 
 const fileContext = inject(FILE_EXPLORER_KEY)
 if (!fileContext) throw new Error('fileExplorer not provided');
@@ -47,89 +90,117 @@ const props = defineProps<{
   currentParentId: number
 }>()
 
+
+// ============ 进度状态 ============
+const totalProgress = ref(0)           // 全局百分比 0~100
+const totalFilesCount = ref(0)         // 总文件数
+const completedFilesCount = ref(0)     // 已完成文件数
+const isUploading = ref(false)         // 是否正在上传  
+const showProgressPanel = ref(false)
+const fileStatuses = ref<Array<{ name: string; status: string; percent: number }>>([])
+function updateFileStatus(fileName: string, status: string, percent: number = 0) {
+  const existing = fileStatuses.value.find(f => f.name === fileName)
+  if (existing) {
+    existing.status = status
+    existing.percent = percent
+  } else {
+    fileStatuses.value.push({ name: fileName, status, percent })
+    // 限制列表长度，避免渲染过多
+    if (fileStatuses.value.length > 20) {
+      fileStatuses.value.shift()
+    }
+  }
+}
+
+
+
 const folderInput = ref<HTMLInputElement | null>(null);
+
+let pendingAdd = false;
 function triggerInput(type: 'file' | 'folder') {
   if (type === 'file') {
+    pendingAdd = true;
     uploader?.open();
   } else if (type === 'folder') {
     folderInput.value?.click();
   }
 }
+const hashCache = new WeakMap<File, string>()   // 缓存文件 MD5
+const BATCH_SIZE = 10                           // 每批文件数
 
-const handleFileChange = (event: Event) => {
-  const target = event.target as HTMLInputElement;
-  const files = target.files;
-  console.log(`文件序列总观是 ${files}`)
-  console.log(`文件序列的item0是 ${files![0]!.webkitRelativePath}`)
-  console.log(`文件序列的item1是 ${files![1]!.webkitRelativePath}`)
-  console.log(`文件序列的item2是 ${files![2]!.webkitRelativePath}`)
-  console.log(`文件序列的item3是 ${files![3]!.webkitRelativePath}`)
-  if (!files || files.length === 0) return;
+const handleFileChange = async (event: Event) => {
+  const target = event.target as HTMLInputElement
+  const files = target.files
+  if (!files || files.length === 0) return
 
   if (!uploader) {
-    ElMessage.error('上传器未初始化');
-    target.value = '';
-    return;
+    ElMessage.error('上传器未初始化')
+    target.value = ''
+    return
   }
 
-  // 使用 addFiles 批量添加所有文件
-  uploader.addFiles(files)
-    .then(() => {
-      // 如果库需要手动启动，则调用 start（根据实际情况选择）
-      if (typeof (uploader as any).start === 'function') {
-        (uploader as any).start();
-      }
-    })
-    .catch((err: Error) => {
-      ElMessage.error('添加文件失败：' + err.message);
-    });
+  const fileList = Array.from(files)
+  const total = fileList.length
+  pendingAdd = true;
 
-  // 重置 input 以便重复选择同一文件夹
-  target.value = '';
-};
 
+  totalFilesCount.value = total
+  completedFilesCount.value = 0
+  fileStatuses.value = []
+  isUploading.value = true
+  showProgressPanel.value = true
+
+  // 分批处理
+  for (let i = 0; i < fileList.length; i += BATCH_SIZE) {
+    const batch = fileList.slice(i, i + BATCH_SIZE)
+
+    // 并行计算本批文件的 MD5
+    await Promise.all(
+      batch.map(async (file) => {
+        const md5 = await calculateFileMD5(file)
+        hashCache.set(file, md5)
+      })
+    )
+
+    // 添加本批文件到上传器
+    uploader.addFiles(batch)
+
+  }
+
+  // 重置 input 以便重复选择
+  target.value = ''
+}
+
+
+const SAMPLE_SIZE = 1 * 1024 * 1024 // 1MB
 
 function calculateFileMD5(file: File): Promise<string> {
   return new Promise((resolve, reject) => {
-    const chunkSize = 5 * 1024 * 1024
-    const chunks = Math.ceil(file.size / chunkSize)
-    const spark = new SparkMD5.ArrayBuffer()
+    // 只取文件头部指定大小的数据
+    const blob = file.slice(0, SAMPLE_SIZE)
     const fileReader = new FileReader()
-    let currentChunk = 0
-
-    const loadNextChunk = (): void => {
-      const start = currentChunk * chunkSize
-      const end = Math.min(start + chunkSize, file.size)
-      const blob = file.slice(start, end)
-      fileReader.readAsArrayBuffer(blob)
-    }
-
-    fileReader.onload = (e: ProgressEvent<FileReader>) => {
+    fileReader.onload = (e) => {
       const result = e.target?.result
       if (result instanceof ArrayBuffer) {
+        const spark = new SparkMD5.ArrayBuffer()
         spark.append(result)
-      }
-      currentChunk++
-      if (currentChunk < chunks) {
-        loadNextChunk()
-      } else {
         resolve(spark.end())
+      } else {
+        reject(new Error('读取文件数据失败'))
       }
     }
-
-    fileReader.onerror = () => {
-      reject(new Error('计算文件 MD5 失败'))
-    }
-
-    loadNextChunk()
+    fileReader.onerror = () => reject(new Error('读取文件失败'))
+    fileReader.readAsArrayBuffer(blob)
   })
 }
 
 
 // 初始化上传会话
 onMounted(() => {
+  let isRefreshed = false
   // 创建上传器
   uploader = FileUD.createUploader(UPLOADER_NAME, {
+    maxFileConcurrent: 10,
     action: async (formData: FormData, uploadFile: UploadFile) => {
       try {
         const metadata = (uploadFile.metadata || {})
@@ -200,15 +271,18 @@ onMounted(() => {
   }
 
   // 初始化分片
-  uploader.onInitChunk = async (file: UploadFile, totalChunks: number) => {
+  uploader.onInitChunk = async (file: UploadFile, totalChunks: number, fileHash: string) => {
     const rawFile = file.File
-    const fileHash = await calculateFileMD5(rawFile)
+    let md5 = hashCache.get(rawFile)
+    if (!md5) {
+      md5 = await calculateFileMD5(rawFile)
+    }
     const relativePath = rawFile.webkitRelativePath || null
 
     const request = {
       fileName: file.fileName,
       fileSize: file.size,
-      fileHash,
+      fileHash: md5,
       parentId: props.currentParentId,
       relativePath: relativePath
     }
@@ -216,14 +290,11 @@ onMounted(() => {
     try {
       const res = await initUpload(request)
       const data = res.data
-      console.log(data)
-
       if (data.isComplete) {
-        refresh()
         return {
-          fileHash,
+          fileHash: md5,
           isInstantUpload: true,
-          chunks: data.uploadedChunks || [],
+          uploadId: 'instant-upload-' + Date.now(),
         }
       }
 
@@ -250,22 +321,25 @@ onMounted(() => {
 
 
       return {
-        fileHash,
+        fileHash: md5,
         isInstantUpload: data.isComplete || false,
         chunks: data.uploadedChunks || [],
       }
     } catch (error) {
       const err = error as Error
-      console.log(err)
+      console.log(`错误信息：${err}`)
       throw error
     }
   }
 
   // 合并分片
   uploader.onMergeChunk = async (chunkManager: any) => {
+    if (chunkManager.isInstantTransfer) {
+      return { success: true, instant: true };
+    }
     const uploadFile = chunkManager.uploadFile as UploadFile
     const metadata = uploadFile.metadata
-    const uploadId = metadata!.uploadId
+    const uploadId = metadata?.uploadId || []
     const parts = metadata!.parts || []
 
     if (!uploadId) {
@@ -279,7 +353,6 @@ onMounted(() => {
 
     try {
       const response = await completeMultipartUpload(request)
-      refresh()
       return response
     } catch (error) {
       const err = error as Error
@@ -287,11 +360,72 @@ onMounted(() => {
     }
   }
 
-  uploader.onSuccess = (file: UploadFile) => {
-    refresh()
+  uploader.onUpdate = async (files: UploadFile[]) => {
+    // 如果正处于添加新文件的准备阶段，则初始化或更新计数
+    if (pendingAdd) {
+      // 仅当没有正在上传且面板未打开时，才重置所有状态（全新上传）
+      if (!isUploading.value && !showProgressPanel.value) {
+        // 全新上传，重置所有计数
+        totalFilesCount.value = files.length;
+        completedFilesCount.value = 0;
+        fileStatuses.value = [];
+        totalProgress.value = 0;
+        showProgressPanel.value = true;
+        isUploading.value = true;
+      } else {
+        // 上传中又添加了文件，只更新总文件数
+        totalFilesCount.value = files.length;
+        // 已完成数不变，面板已打开
+      }
+      pendingAdd = false; // 消费标记
+    } else {
+      // 非添加引起的 update（比如文件状态变化），只更新总文件数（防止漏计）
+      totalFilesCount.value = files.length;
+    }
+
+    // 如果文件列表为空，关闭面板（可选）
+    if (files.length === 0) {
+      showProgressPanel.value = false;
+      isUploading.value = false;
+    }
   }
 
+  uploader.onSuccess = async (Response, file) => {
+    completedFilesCount.value++;
+    updateFileStatus(file.fileName, 'success', 100);
+
+    // 全部上传完成
+    if (completedFilesCount.value === totalFilesCount.value && totalFilesCount.value > 0) {
+      totalProgress.value = 100;
+      isUploading.value = false;
+      // 刷新文件列表
+      refresh();
+      ElMessage.success('所有文件上传完成');
+    }
+  };
+
+
+  uploader.on('progress', (percent: number) => {
+    totalProgress.value = percent
+  })
+
+  uploader.on('chunk-success', ({ file, percent }: any) => {
+    if (file) {
+      updateFileStatus(file.fileName, '上传中', percent || 0)
+    }
+  })
+
+  setInterval(() => {
+    console.log('activeFiles:', uploader!.activeFiles.length);
+    console.log('files status:', uploader!.files.map(f => f.status));
+  }, 5000);
+
+
 })
+
+function closeProgressPanel() {
+  showProgressPanel.value = false
+}
 
 
 </script>
@@ -389,5 +523,187 @@ onMounted(() => {
 .dropdown-item:hover {
   background: #f0f5ff;
   color: #2b7aff;
+}
+
+.upload-progress {
+  margin-top: 12px;
+  padding: 12px 16px;
+  background: #f8fafc;
+  border-radius: 8px;
+  border: 1px solid #e4e9f2;
+  min-width: 280px;
+}
+
+.progress-row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.progress-label {
+  font-size: 13px;
+  color: #2c3e50;
+  white-space: nowrap;
+}
+
+.stats-row {
+  display: flex;
+  justify-content: space-between;
+  font-size: 13px;
+  color: #555;
+  margin-top: 4px;
+}
+
+.file-status-list {
+  max-height: 150px;
+  overflow-y: auto;
+  margin-top: 8px;
+  font-size: 12px;
+  border-top: 1px solid #e4e9f2;
+  padding-top: 6px;
+}
+
+.file-status-item {
+  display: flex;
+  justify-content: space-between;
+  padding: 2px 0;
+  border-bottom: 1px solid #f0f2f5;
+}
+
+.file-status-item .file-name {
+  max-width: 180px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.file-status-item .file-status.success {
+  color: #52c41a;
+}
+
+.file-status-item .file-status.error {
+  color: #f5222d;
+}
+
+.file-status-item .file-status.uploading {
+  color: #1890ff;
+}
+
+.more-hint {
+  color: #999;
+  font-size: 12px;
+  padding: 4px 0;
+}
+</style>
+
+<style>
+/* 浮层遮罩 */
+.progress-backdrop {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: rgba(0, 0, 0, 0.3);
+  z-index: 999;
+}
+
+/* 进度卡片 */
+.progress-card {
+  position: fixed;
+  bottom: 40px;
+  right: 40px;
+  width: 380px;
+  max-height: 360px;
+  background: #ffffff;
+  border-radius: 12px;
+  box-shadow: 0 8px 30px rgba(0, 0, 0, 0.2);
+  padding: 20px 24px;
+  z-index: 1000;
+  overflow-y: auto;
+  border: 1px solid #e4e9f2;
+}
+
+/* 关闭按钮 */
+.close-btn {
+  position: absolute;
+  top: 8px;
+  right: 12px;
+  background: none;
+  border: none;
+  font-size: 18px;
+  color: #999;
+  cursor: pointer;
+  padding: 4px 8px;
+  border-radius: 4px;
+}
+
+.close-btn:hover {
+  background: #f0f0f0;
+  color: #333;
+}
+
+/* 卡片内部元素复用之前的样式 */
+.progress-row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-bottom: 6px;
+}
+
+.progress-label {
+  font-size: 14px;
+  font-weight: 500;
+  color: #2c3e50;
+  white-space: nowrap;
+}
+
+.stats-row {
+  display: flex;
+  justify-content: space-between;
+  font-size: 13px;
+  color: #555;
+  margin-bottom: 8px;
+}
+
+.file-status-list {
+  max-height: 180px;
+  overflow-y: auto;
+  border-top: 1px solid #e4e9f2;
+  padding-top: 8px;
+  margin-top: 4px;
+}
+
+.file-status-item {
+  display: flex;
+  justify-content: space-between;
+  padding: 3px 0;
+  font-size: 13px;
+  border-bottom: 1px solid #f0f2f5;
+}
+
+.file-status-item .file-name {
+  max-width: 200px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.file-status-item .file-status.success {
+  color: #52c41a;
+}
+
+.file-status-item .file-status.error {
+  color: #f5222d;
+}
+
+.file-status-item .file-status.uploading {
+  color: #1890ff;
+}
+
+.more-hint {
+  color: #999;
+  font-size: 12px;
+  padding: 4px 0;
 }
 </style>

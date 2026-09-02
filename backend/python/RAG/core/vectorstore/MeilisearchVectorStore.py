@@ -5,15 +5,19 @@ from typing import Annotated, Any, Dict, List, Optional, Tuple, Type, Iterable
 
 import meilisearch
 from dotenv import load_dotenv
-from fastapi import Depends
+from fastapi import Depends,FastAPI,Request
 from langchain_core.documents import Document
 from langchain_core.embeddings import Embeddings
 from langchain_core.vectorstores import VectorStore
+from contextlib import asynccontextmanager
 
-from ..lifespan_manager import manager
 from ..embeddings_model_lifespan import get_embeddings_model
 from RAG.Logging import logger
 load_dotenv()
+
+
+test_Vector = None
+
 
 
 class CustomMeilisearch(VectorStore):
@@ -254,22 +258,27 @@ class CustomMeilisearch(VectorStore):
 
 # ================= FastAPI 依赖注入配置 =================
 
-@manager.register
-async def get_meilisearch_client():
+@asynccontextmanager
+async def meilisearch_client(app:FastAPI):
     logger.info("正在初始化 meilisearch 客户端")
     client = meilisearch.Client(
         url=os.getenv("MEILISEARCH_URL", "localhost:7700"),
         api_key=os.getenv("MEILISEARCH_API_KEY", "oEkwo3F1GozGwD7lkeDevr_PMMNx5fgku1W1XOwDlW4")
     )
+    app.state.meilisearch_client = client
     yield client
     logger.info("关闭 meilisearch")
 
 
-@manager.register
-async def get_vectorstore(
-    embeddings_model: Annotated[Embeddings, Depends(get_embeddings_model)],
-    meilisearch_client: Annotated[meilisearch.Client, Depends(get_meilisearch_client)]
-):
+async def get_meilisearch_client(request: Request) -> meilisearch.Client:
+    """获取 meilisearch_client 实例"""
+    return request.app.state.meilisearch_client
+
+
+@asynccontextmanager
+async def vectorstore_lifespan(app:FastAPI):
+    embeddings_model = app.state.embeddings_model
+    meilisearch_client = app.state.meilisearch_client
     # 配置 Meilisearch 服务端的 Embedders
     embedders = {
         "default": {
@@ -313,5 +322,10 @@ async def get_vectorstore(
         metadata_key="metadata",
         embedder_name="default"
     )
-    
-    yield vector_store
+    app.state.vector_store = vector_store
+    test_Vector = vector_store
+    yield vector_store, test_Vector
+
+async def get_vectorstore(request: Request) -> VectorStore:
+    """获取 OSS 客户端 实例"""
+    return request.app.state.vector_store

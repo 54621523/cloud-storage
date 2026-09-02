@@ -1,13 +1,16 @@
 package demo.cloud.auth.service;
 
-import com.baomidou.mybatisplus.core.conditions.update.LambdaUpdateWrapper;
 import demo.cloud.auth.dto.QuotaInfo;
 import demo.cloud.auth.dubboService.UserQuotaDubboService;
 import demo.cloud.auth.mapper.UserMapper;
 import demo.cloud.auth.pojo.User;
 import org.apache.dubbo.config.annotation.DubboService;
+import org.redisson.api.RLock;
+import org.redisson.api.RedissonClient;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
+
+import java.util.concurrent.TimeUnit;
 
 @DubboService(version = "1.0.0")
 @Service
@@ -15,6 +18,8 @@ public class UserQuotaDubboServiceImpl implements UserQuotaDubboService {
 
     @Autowired
     private UserMapper userMapper;
+    @Autowired
+    private RedissonClient redissonClient;
 
     /**
      * 检查用户剩余配额是否足够
@@ -40,25 +45,25 @@ public class UserQuotaDubboServiceImpl implements UserQuotaDubboService {
      */
     @Override
     public boolean addUsedQuota(Long userId, Long fileSize) {
-        // 先查询当前用户信息（含version）
-        User user = userMapper.selectById(userId);
-        if (user == null) {
-            return false;
-        }
-        // 检查剩余配额是否足够
-        if (user.getQuotaTotal() - user.getQuotaUsed() < fileSize) {
-            return false;
-        }
+        String lockKey = "quota_lock:" + userId;
+        RLock lock = redissonClient.getLock(lockKey);
+        try {
+            lock.lock(3, TimeUnit.SECONDS);
+            User user = userMapper.selectById(userId);
+            if (user == null) {
+                return false;
+            }
+            // 检查剩余配额是否足够
+            if (user.getQuotaTotal() - user.getQuotaUsed() < fileSize) {
+                return false;
+            }
 
-        LambdaUpdateWrapper<User> wrapper = new LambdaUpdateWrapper<>();
-        wrapper.eq(User::getUserId, userId)
-                .eq(User::getVersion, user.getVersion())          // 乐观锁版本条件
-                .apply("quota_total - quota_used >= {0}", fileSize) // 再次检查剩余空间（防并发）
-                .setSql("quota_used = quota_used + " + fileSize)
-                .setSql("version = version + 1");
-
-        int rows = userMapper.update(null, wrapper);
-        return rows > 0;
+            user.setQuotaUsed(user.getQuotaUsed() + fileSize);
+            int rows = userMapper.updateById(user);
+            return rows > 0;
+        }finally {
+            if (lock.isHeldByCurrentThread()) lock.unlock();
+        }
     }
 
     /**
@@ -69,25 +74,26 @@ public class UserQuotaDubboServiceImpl implements UserQuotaDubboService {
      */
     @Override
     public boolean subtractUsedQuota(Long userId, Long fileSize) {
-        // 先查询当前用户信息（含version）
-        User user = userMapper.selectById(userId);
-        if (user == null) {
-            return false;
-        }
-        // 检查已用配额是否足够扣除（避免负数）
-        if (user.getQuotaUsed() < fileSize) {
-            return false;
-        }
+        String lockKey = "quota_lock:" + userId;
+        RLock lock = redissonClient.getLock(lockKey);
+        try {
+            lock.lock(3, TimeUnit.SECONDS);
+            // 先查询当前用户信息（含version）
+            User user = userMapper.selectById(userId);
+            if (user == null) {
+                return false;
+            }
+            // 检查已用配额是否足够扣除（避免负数）
+            if (user.getQuotaUsed() < fileSize) {
+                return false;
+            }
 
-        LambdaUpdateWrapper<User> wrapper = new LambdaUpdateWrapper<>();
-        wrapper.eq(User::getUserId, userId)
-                .eq(User::getVersion, user.getVersion())          // 乐观锁版本条件
-                .apply("quota_used >= {0}", fileSize)             // 再次检查（防并发）
-                .setSql("quota_used = quota_used - " + fileSize)
-                .setSql("version = version + 1");
-
-        int rows = userMapper.update(null, wrapper);
-        return rows > 0;
+            user.setQuotaUsed(user.getQuotaUsed() - fileSize);
+            int rows = userMapper.updateById(user);
+            return rows > 0;
+        } finally {
+            if (lock.isHeldByCurrentThread()) lock.unlock();
+        }
     }
 
     /**

@@ -10,8 +10,11 @@ import lombok.Data;
 import java.time.LocalDateTime;
 
 @Data
-@MSIndex(uid = "user_file", primaryKey = "id")
+@MSIndex(uid = "user_file", primaryKey = "searchId")
 public class FileDocument {
+
+    @Schema(hidden = true)   // 前端不需要展示
+    private String searchId;   // 建议在入库时生成 UUID.randomUUID().toString()
 
     @MSFiled(openSearch = true)
     private String namePure;   // 纯名称（不含后缀，便于模糊匹配）

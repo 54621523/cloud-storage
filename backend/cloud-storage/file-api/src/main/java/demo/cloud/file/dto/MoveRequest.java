@@ -18,5 +18,9 @@ public class MoveRequest {
     @Schema(description = "目标父目录Id",
         example = "1001"
     )
-    Long parentId;
+    Long targetParentId;
+
+    @Schema(description = "目标父目录Id",
+    example = "2002")
+    Long sourceParentId;
 }

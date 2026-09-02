@@ -9,6 +9,7 @@ import org.apache.ibatis.annotations.Param;
 
 import java.util.Collection;
 import java.util.List;
+import java.util.Set;
 
 @Mapper
 public interface UserFileMapper extends BaseMapper<UserFile>, MPJBaseMapper<UserFile> {
@@ -22,4 +23,6 @@ public interface UserFileMapper extends BaseMapper<UserFile>, MPJBaseMapper<User
 
 
     void batchRestoreFiles(@Param("list") Collection<UserFile> list);
+
+    Set<Long> getFileChilren(@Param("folderIds") Collection<Long> folderIds, Long userId);
 }

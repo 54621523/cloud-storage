@@ -6,6 +6,7 @@ import com.fasterxml.jackson.datatype.jsr310.JavaTimeModule;
 import com.meilisearch.sdk.Client;
 import com.meilisearch.sdk.Index;
 import com.meilisearch.sdk.SearchRequest;
+import com.meilisearch.sdk.exceptions.MeilisearchApiException;
 import com.meilisearch.sdk.model.SearchResultPaginated;
 import com.meilisearch.sdk.model.Settings;
 import com.meilisearch.sdk.model.TaskInfo;
@@ -13,6 +14,7 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Component;
 
+import java.util.Collection;
 import java.util.List;
 
 @Slf4j
@@ -36,16 +38,15 @@ public class MeilisearchTemplate {
 
     public void createIndex(String indexUid, String primaryKey) {
         try {
-            Index index = getIndex(indexUid);
-            if(index != null) {
-                log.info("索引已存在: {}", indexUid);
-                return;
+            // 检查是否存在
+            meilisearchClient.getIndex(indexUid);
+        } catch (MeilisearchApiException e) {
+            if (e.getMessage().contains("not found")) {
+                // 创建索引
+                meilisearchClient.createIndex(indexUid, primaryKey);
+            } else {
+                throw new RuntimeException("获取索引失败", e);
             }
-            TaskInfo taskInfo = meilisearchClient.createIndex(indexUid, primaryKey);
-            log.info("创建索引成功: {}, taskId: {}", indexUid, taskInfo.getTaskUid());
-        } catch (Exception e) {
-            log.error("创建索引失败: {}", indexUid, e);
-            throw new RuntimeException("创建索引失败", e);
         }
     }
 
@@ -109,9 +110,19 @@ public class MeilisearchTemplate {
         try {
             Index index = getIndex(indexUid);
             TaskInfo taskInfo = index.deleteDocument(documentId);
-            log.info("删除文档成功: {}, documentId: {}, taskId: {}", indexUid, documentId, taskInfo.getTaskUid());
         } catch (Exception e) {
             log.error("删除文档失败: {}, documentId: {}", indexUid, documentId, e);
+            throw new RuntimeException("删除文档失败", e);
+        }
+    }
+
+    public void deleteDocuments(String indexUid, Collection<String> documentIds){
+        try {
+            Index index = getIndex(indexUid);
+            TaskInfo taskInfo = index.deleteDocuments((List<String>) documentIds);
+        }
+        catch (Exception e) {
+            log.error("删除文档失败: {}", indexUid, e);
             throw new RuntimeException("删除文档失败", e);
         }
     }

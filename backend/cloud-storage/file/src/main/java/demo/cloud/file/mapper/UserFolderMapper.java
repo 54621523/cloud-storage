@@ -4,9 +4,7 @@ package demo.cloud.file.mapper;
 import com.baomidou.mybatisplus.core.mapper.BaseMapper;
 import demo.cloud.file.dto.ItemIdentity;
 import demo.cloud.file.pojo.UserFolder;
-import org.apache.ibatis.annotations.Insert;
 import org.apache.ibatis.annotations.Mapper;
-import org.apache.ibatis.annotations.Options;
 import org.apache.ibatis.annotations.Param;
 
 import java.util.Collection;
@@ -34,12 +32,6 @@ public interface UserFolderMapper extends BaseMapper<UserFolder> {
 
     List<UserFolder> selectSubTreeBatch(@Param("rootIds") List<Long> rootIds);
 
-
-
-    @Insert("INSERT IGNORE INTO user_folder (user_id, parent_id, name, create_time, update_time) " +
-            "VALUES (#{userId}, #{parentId}, #{name}, NOW(), NOW())")
-    @Options(useGeneratedKeys = true, keyProperty = "id")
-    int insertIgnore(UserFolder newFolder);
 
     Set<Long> getFolderChildren(@Param("folderIds") Collection<Long> folderIds,
                                 @Param("userId") Long userId);

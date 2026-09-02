@@ -232,4 +232,37 @@ public class PythonController {
 
         return emitter;
     }
+
+
+    /**
+     * 模拟 AI 对话（测试用）
+     * 不调用 Python，直接构造 Mock SSE 事件流
+     */
+    @PreAuthorize("isAuthenticated()")
+    @Operation(summary = "AI对话（测试）", description = "用于测试，实际调用 Python 服务")
+    @PostMapping(value = "/chat/test")
+    public Result testChat(@RequestBody ChatRequest request) {
+        String sessionId = request.getSessionId();
+        // 若前端未传 sessionId，则生成一个模拟值
+        String validSessionId = (sessionId != null && !sessionId.isEmpty())
+                ? sessionId : "mock-session-" + System.currentTimeMillis();
+
+        Map<String, Object> requestBody = new HashMap<>();
+        requestBody.put("query", request.getMessage());
+        requestBody.put("sessionId", validSessionId);
+        List<Long> allowedDocIds = List.of(0L,1L, 2L, 3L, 4L,5L,6L,7L,8L,9L,10L,11L,12L,13L,14L);
+        requestBody.put("doc_ids", allowedDocIds);
+
+
+        String serviceName = "fastapi-service";
+        String url = "http://" + serviceName + "/test/v1/rag/query";
+        ResponseEntity<Map> response = restTemplate.postForEntity(url, requestBody, Map.class);
+        if (response.getStatusCode().is2xxSuccessful()) {
+            log.info(response.toString());
+            return Result.success();
+        }
+        return Result.error("python调用错误");
+    }
+
+
 }

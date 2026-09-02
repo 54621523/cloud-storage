@@ -32,6 +32,24 @@
         WHERE uf.id = #{userFileId}
     </select>
 
+    <select id="getFileChilren" resultType="java.lang.Long">
+        WITH RECURSIVE folder_cte AS (
+        SELECT id FROM user_folder
+        WHERE user_id = #{userId}
+        AND id IN
+        <foreach collection="folderIds" item="id" open="(" close=")" separator=",">
+            #{id}
+        </foreach>
+        UNION ALL
+        SELECT f.id FROM user_folder f
+        INNER JOIN folder_cte c ON f.parent_id = c.id
+        WHERE f.user_id = #{userId}
+        )
+        SELECT uf.id FROM user_file uf
+        WHERE uf.user_id = #{userId}
+        AND uf.parent_id IN (SELECT id FROM folder_cte)
+    </select>
+
     <update id="batchRestoreFiles">
         <foreach collection="list" item="item" separator=";">
             UPDATE user_file

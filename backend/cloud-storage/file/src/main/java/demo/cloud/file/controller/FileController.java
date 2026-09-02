@@ -34,8 +34,8 @@ public class FileController {
     @GetMapping("/list-file")
     @Operation(summary = "获取文件列表", description = "根据父目录ID查询该目录下的所有文件和子文件夹")
     public Result<List<VirtualFileVO>> listFiles(
-            @Parameter(description = "父目录ID，若为0或null则自动定位到用户根目录", example = "1001")
-            @RequestParam(required = false) Long parentId) {
+            @Parameter(description = "父目录ID", example = "1001")
+            @RequestParam Long parentId) {
 
         Long userId = BaseContext.getUserId();
         log.info("用户 {} 请求浏览目录，parentId: {}", userId, parentId);
@@ -104,7 +104,7 @@ public class FileController {
     @Operation(summary = "移动文件/文件夹", description = "将文件/文件夹移动到指定父目录下")
     public Result moveTo(@RequestBody MoveRequest request){
         Long userId = BaseContext.getUserId();
-        log.info("用户{} 移动文件/文件夹 新目录{}", userId, request.getParentId());
+        log.info("用户{} 移动文件/文件夹 新目录{}", userId, request.getTargetParentId());
         fileManagerService.moveTo(request, userId);
         return Result.success();
     }

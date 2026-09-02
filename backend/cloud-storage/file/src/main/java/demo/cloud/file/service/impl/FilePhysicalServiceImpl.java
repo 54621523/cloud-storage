@@ -14,6 +14,7 @@ import org.springframework.transaction.annotation.Transactional;
 import java.time.LocalDateTime;
 import java.util.Collection;
 import java.util.List;
+import java.util.Map;
 
 @Slf4j
 @Service
@@ -51,6 +52,16 @@ public class FilePhysicalServiceImpl extends ServiceImpl<FilePhysicalMapper, Fil
     @Override
     public void decreaseRef(Collection<Long> id) {
         filePhysicalMapper.batchDecrementRefCount(id);
+    }
+
+    /**
+     * @param id_decrement
+     */
+    @Override
+    public void decreaseRef(Map<Long, Long> id_decrement) {
+        for(Map.Entry<Long, Long> entry : id_decrement.entrySet() ){
+            filePhysicalMapper.decreaseRefCountByMap(entry.getKey(), entry.getValue());
+        }
     }
 
     @Override

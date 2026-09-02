@@ -76,17 +76,8 @@ public class ShareController {
         shareService.remove(new LambdaQueryWrapper<ShareLink>()
                 .eq(ShareLink::getId,shareId)
                 .eq(ShareLink::getUserId,userId));
+        //TODO 缓存失效
 
-        return Result.success();
-    }
-
-
-    /**
-     * 更新分享
-     * @return
-     */
-    @PutMapping("/update")
-    public Result updateSharedFile(){
         return Result.success();
     }
 

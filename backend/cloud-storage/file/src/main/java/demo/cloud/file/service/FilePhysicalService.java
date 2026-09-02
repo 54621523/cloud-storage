@@ -4,6 +4,7 @@ import com.baomidou.mybatisplus.extension.service.IService;
 import demo.cloud.file.pojo.FilePhysical;
 
 import java.util.Collection;
+import java.util.Map;
 
 public interface FilePhysicalService extends IService<FilePhysical> {
 
@@ -21,6 +22,8 @@ public interface FilePhysicalService extends IService<FilePhysical> {
 
     
     void decreaseRef(Collection<Long> id);
+
+    void decreaseRef(Map<Long, Long> id_decrement);
 
     
     void decreaseRef(Long... id);

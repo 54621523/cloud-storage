@@ -4,27 +4,38 @@ import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.baomidou.mybatisplus.core.conditions.update.LambdaUpdateWrapper;
 import com.baomidou.mybatisplus.core.metadata.IPage;
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
+import com.fasterxml.jackson.core.JsonProcessingException;
+import com.fasterxml.jackson.core.type.TypeReference;
+import com.fasterxml.jackson.databind.ObjectMapper;
+import demo.cloud.auth.dubboService.UserQuotaDubboService;
 import demo.cloud.common.exception.BusinessException;
 import demo.cloud.common.pojo.PageResult;
+import demo.cloud.file.cache.CacheInvalidationHelper;
 import demo.cloud.file.constant.FileItemType;
 import demo.cloud.file.dto.*;
 import demo.cloud.file.pojo.FileDocument;
 import demo.cloud.file.pojo.UserFile;
 import demo.cloud.file.pojo.UserFolder;
-import demo.cloud.file.service.FileManagerService;
-import demo.cloud.file.service.FilePhysicalService;
-import demo.cloud.file.service.UserFileService;
-import demo.cloud.file.service.UserRecycleBinService;
+import demo.cloud.file.service.*;
 import demo.cloud.file.service.search.FileSearchRepository;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.apache.commons.lang3.StringUtils;
+import org.apache.seata.spring.annotation.GlobalTransactional;
+import org.apache.seata.tm.api.transaction.TransactionHook;
+import org.apache.seata.tm.api.transaction.TransactionHookManager;
+import org.springframework.amqp.rabbit.core.RabbitTemplate;
 import org.springframework.beans.BeanUtils;
 import org.springframework.dao.DuplicateKeyException;
+import org.springframework.data.redis.core.RedisTemplate;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.time.Duration;
 import java.time.LocalDateTime;
 import java.util.*;
+import java.util.concurrent.ThreadLocalRandom;
+import java.util.function.Function;
 import java.util.stream.Collectors;
 
 @Service
@@ -33,11 +44,23 @@ import java.util.stream.Collectors;
 public class FileManagerServiceImpl implements FileManagerService {
 
     private final UserFileService userFileService;
-    private final FolderService userFolderService;
+    private final UserFolderService userFolderService;
     private final UserRecycleBinService userRecycleBinService;
     private final FilePhysicalService filePhysicalService;
+    private final ObjectMapper objectMapper;
+    private final CacheInvalidationHelper cache;
+    private final UserQuotaDubboService quotaDubboService;
+
+    private final RabbitTemplate rabbitTemplate;
+    private static final String EXCHANGE_NAME = "file.exchange";
+
 
     private final FileSearchRepository fileSearchRepository;
+    // ================= 缓存实现 ========================
+    private final RedisTemplate<String, Object> redisTemplate;
+    private static final String DIR_CACHE_PREFIX = "dir:members:";
+    private static final long BASE_TTL_SECONDS = 600;       // 10分钟
+    private static final int OFFSET_SECONDS = 120;          // 随机偏移 ±2分钟
 
     // ====== Create ======
 
@@ -50,7 +73,8 @@ public class FileManagerServiceImpl implements FileManagerService {
         folder.setName(request.getName());
         folder.setUserId(userId);
         try{
-        userFolderService.save(folder);
+            userFolderService.saveFolder(folder);
+            cache.evictDirectoryCache(request.getParentId());
         }catch (DuplicateKeyException e) {
             throw new BusinessException(0, "该目录下已存在同名文件夹");
         }
@@ -125,6 +149,93 @@ public class FileManagerServiceImpl implements FileManagerService {
         log.info("ES索引添加成功，id: {}, type: {}", id, type);
     }
 
+    public void addDocuments(List<ItemIdentity> entries) {
+        if (entries.isEmpty()) {
+            return;
+        }
+        ItemGroup group = ItemGroup.from(entries);
+
+        // 1. 按类型分组，分别处理
+        List<FileDocument> docList = new ArrayList<>();
+
+        // 2. 批量处理文件
+        if (!group.fileIds().isEmpty()) {
+            List<UserFile> files = userFileService.list(
+                    new LambdaQueryWrapper<UserFile>()
+                            .in(UserFile::getId, group.fileIds())
+            );
+            for (UserFile file : files) {
+                FileDocument doc = buildFileDocument(file);
+                docList.add(doc);
+            }
+        }
+
+        // 3. 批量处理文件夹
+        if (!group.folderIds().isEmpty()) {
+            List<UserFolder> folders = userFolderService.list(
+                    new LambdaQueryWrapper<UserFolder>()
+                            .in(UserFolder::getId, group.folderIds())
+            );
+            for (UserFolder folder : folders) {
+                FileDocument doc = buildFolderDocument(folder);
+                docList.add(doc);
+            }
+        }
+
+        // 4. 批量写入 Meilisearch
+        if (!docList.isEmpty()) {
+            // 分批写入，防止单次请求体过大（Meilisearch 默认限制 100MB，建议每批 1000 条）
+            int batchSize = 1000;
+            for (int i = 0; i < docList.size(); i += batchSize) {
+                int end = Math.min(i + batchSize, docList.size());
+                List<FileDocument> batch = docList.subList(i, end);
+                fileSearchRepository.addDocuments(batch);
+                log.info("批量索引写入成功，批次：{}-{}，共 {} 条", i, end-1, batch.size());
+            }
+        }
+    }
+
+    public void addDocuments(List<Long> ids, FileItemType type) {
+        if (ids.isEmpty()) {
+            return;
+        }
+        List<FileDocument> docList = new ArrayList<>();
+        // 处理文件
+        if (type.equals(FileItemType.FILE)) {
+            List<UserFile> files = userFileService.list(
+                    new LambdaQueryWrapper<UserFile>()
+                            .in(UserFile::getId, ids)
+            );
+            for (UserFile file : files) {
+                FileDocument doc = buildFileDocument(file);
+                docList.add(doc);
+            }
+        }
+
+        // 处理文件夹
+        if (type.equals(FileItemType.FOLDER)) {
+            List<UserFolder> folders = userFolderService.list(
+                    new LambdaQueryWrapper<UserFolder>()
+                            .in(UserFolder::getId, ids)
+            );
+            for (UserFolder folder : folders) {
+                FileDocument doc = buildFolderDocument(folder);
+                docList.add(doc);
+            }
+        }
+        // 4. 批量写入 Meilisearch
+        if (!docList.isEmpty()) {
+            // 分批写入，防止单次请求体过大（Meilisearch 默认限制 100MB，建议每批 1000 条）
+            int batchSize = 1000;
+            for (int i = 0; i < docList.size(); i += batchSize) {
+                int end = Math.min(i + batchSize, docList.size());
+                List<FileDocument> batch = docList.subList(i, end);
+                fileSearchRepository.addDocuments(batch);
+                log.info("批量索引写入成功，批次：{}-{}，共 {} 条", i, end-1, batch.size());
+            }
+        }
+    }
+
     // ====== Read ======
 
     /**
@@ -133,18 +244,19 @@ public class FileManagerServiceImpl implements FileManagerService {
      */
     public List<VirtualFileVO> getVirtualFileList(Long parentId, Long userId) {
 
-        // 0. 获取用户根目录
-        if (parentId == null || parentId == 0L) {
-            UserFolder rootFolder = userFolderService.getOne(
-                    new LambdaQueryWrapper<UserFolder>()
-                            .eq(UserFolder::getUserId, userId)
-                            .eq(UserFolder::getParentId, 0L)
-            );
-            if (rootFolder == null) {
-                return new ArrayList<>();
+        String cacheKey = DIR_CACHE_PREFIX + ":" + parentId;
+        String cachedJson = (String) redisTemplate.opsForValue().get(cacheKey);
+        if (cachedJson != null) {
+            try {
+                // 使用 Jackson 反序列化
+                return objectMapper.readValue(cachedJson, new TypeReference<List<VirtualFileVO>>() {});
+            } catch (JsonProcessingException e) {
+                log.error("反序列化缓存失败，缓存 Key: {}", cacheKey, e);
+                // 损坏的缓存直接删除，避免反复出错
+                cache.evictDirectoryCache(parentId);
             }
-            parentId = rootFolder.getId();
         }
+
         // 1.1. 构建文件夹查询条件
         LambdaQueryWrapper<UserFolder> folderWrapper = new LambdaQueryWrapper<UserFolder>()
                 .eq(UserFolder::getParentId, parentId)
@@ -164,7 +276,15 @@ public class FileManagerServiceImpl implements FileManagerService {
         List<UserFile> files = userFileService.list(fileWrapper);
 
         // 4. 转换并排序返回
-        return mergeAndConvert(folders, files);
+        List<VirtualFileVO> result = mergeAndConvert(folders, files);
+        try {
+            String json = objectMapper.writeValueAsString(result);
+            long ttl = BASE_TTL_SECONDS + ThreadLocalRandom.current().nextInt(-OFFSET_SECONDS, OFFSET_SECONDS + 1);
+            redisTemplate.opsForValue().set(cacheKey, json, Duration.ofSeconds(Math.max(ttl, 1)));
+        } catch (JsonProcessingException e) {
+            log.error("序列化缓存失败", e);
+        }
+        return result;
     }
 
     @Override
@@ -219,7 +339,7 @@ public class FileManagerServiceImpl implements FileManagerService {
         int currentPage = (page == null || page < 1) ? 1 : page;
         int pageSize = (size == null || size < 1) ? 10 : size;
 
-        // 1. 从 ES 查询
+        // 1. 从 搜索引擎 查询
         PageResult<FileDocument> pageResult = fileSearchRepository.searchFile(
                 keyword, userId, null, null, null, null, currentPage, pageSize
         );
@@ -237,7 +357,7 @@ public class FileManagerServiceImpl implements FileManagerService {
     @Transactional(rollbackFor = Exception.class)
     public void restore(RestoreRequest request, Long userId) {
         ItemGroup group = ItemGroup.from(request.getItems());
-
+        Set<Long> parentIdsToEvict = new HashSet<>(); // 收集需要清除缓存的目录ID
         // 1. 处理文件恢复（存在同名则重命名）
         if (!group.fileIds().isEmpty()) {
             List<UserFile> files = userFileService.list(
@@ -261,6 +381,7 @@ public class FileManagerServiceImpl implements FileManagerService {
                 resolvedFiles.addAll(
                         userFileService.resolveNameConflicts(entry.getValue(), userId, actualParentId)
                 );
+                parentIdsToEvict.add(actualParentId);
             }
 
             // 批量更新（清空 deleted_at + 更新 name）
@@ -291,12 +412,42 @@ public class FileManagerServiceImpl implements FileManagerService {
                 resolvedFolders.addAll(
                         userFolderService.resolveNameConflicts(entry.getValue(), userId, entry.getKey())
                 );
+                parentIdsToEvict.add(actualParentId);
             }
             // 批量更新
             for (UserFolder folder : resolvedFolders) {
                 folder.setDeletedAt(null);
             }
             userFolderService.updateBatchById(resolvedFolders);
+        }
+        for (Long parentId : parentIdsToEvict) {
+            cache.evictDirectoryCache(parentId);
+        }
+    }
+
+    /**
+     * @param id
+     * @param type
+     */
+    @Override
+    public void renameDocument(Long id, FileItemType type, String newName) {
+        if(type.equals(FileItemType.FOLDER)){
+            UserFolder one = userFolderService.getOne(
+                    new LambdaQueryWrapper<UserFolder>()
+                            .eq(UserFolder::getId, id)
+            );
+            FileDocument fileDocument = buildFolderDocument(one);
+            fileDocument.setName(newName);
+            fileSearchRepository.updateDocument(fileDocument);
+        }
+        if(type.equals(FileItemType.FILE)){
+            UserFile one = userFileService.getOne(
+                    new LambdaQueryWrapper<UserFile>()
+                            .eq(UserFile::getId, id)
+            );
+            FileDocument fileDocument = buildFileDocument(one);
+            fileDocument.setName(newName);
+            fileSearchRepository.updateDocument(fileDocument);
         }
     }
 
@@ -319,6 +470,12 @@ public class FileManagerServiceImpl implements FileManagerService {
             }catch (DuplicateKeyException e){
                 throw new BusinessException(0,"文件名已被占用");
             }
+            UserFile one = userFileService.getOne(
+                    new LambdaQueryWrapper<UserFile>()
+                            .eq(UserFile::getId, request.getId())
+                            .isNull(UserFile::getDeletedAt)
+            );
+            cache.evictDirectoryCache(one.getParentId());
             return;
         }
         if (request.getType().equals(FileItemType.FOLDER)) {
@@ -336,6 +493,12 @@ public class FileManagerServiceImpl implements FileManagerService {
             }catch (DuplicateKeyException e){
                 throw new BusinessException(0,"文件夹名已被占用");
             }
+            UserFolder one = userFolderService.getOne(
+                    new LambdaQueryWrapper<UserFolder>()
+                            .eq(UserFolder::getId, request.getId())
+                            .isNull(UserFolder::getDeletedAt)
+            );
+            cache.evictDirectoryCache(one.getParentId());
             return;
         }
 
@@ -345,11 +508,9 @@ public class FileManagerServiceImpl implements FileManagerService {
     @Override
     @Transactional(rollbackFor = Exception.class)
     public void moveTo(MoveRequest request, Long userId) {
-        userFolderService.validateParent(userId, request.getParentId(), null);
+        userFolderService.validateParent(userId, request.getTargetParentId(), null);
         // 1. 从request中分离出文件Id和文件夹Id
         ItemGroup group = ItemGroup.from(request.getItems());
-
-
         if (!group.fileIds().isEmpty()) {
             List<UserFile> moveFiles = userFileService.list(
                     new LambdaQueryWrapper<UserFile>()
@@ -360,10 +521,16 @@ public class FileManagerServiceImpl implements FileManagerService {
             if (moveFiles.size() != group.fileIds().size()) {
                 throw new BusinessException(0, "部分项目不存在或已被删除，请刷新后重试");
             }
-            moveFiles.forEach(file -> file.setParentId(request.getParentId()));
-            List<UserFile> files = userFileService.resolveNameConflicts(moveFiles, userId, request.getParentId());
+            moveFiles.forEach(file -> file.setParentId(request.getTargetParentId()));
+            List<UserFile> files = userFileService.resolveNameConflicts(moveFiles, userId, request.getTargetParentId());
+
 
             userFileService.updateBatchById(files);
+            // 目标目录清除
+            cache.evictDirectoryCache(request.getTargetParentId());
+            // 源目录清除
+            Long parentId = files.get(0).getParentId();
+            cache.evictDirectoryCache(parentId);
         }
         if (!group.folderIds().isEmpty()) {
             List<UserFolder> moveFolders = userFolderService.list(
@@ -375,62 +542,141 @@ public class FileManagerServiceImpl implements FileManagerService {
             if (moveFolders.size() != group.folderIds().size()) {
                 throw new BusinessException(0, "部分项目不存在或已被删除，请刷新后重试");
             }
-            if (group.folderIds().contains(request.getParentId())
+            if (group.folderIds().contains(request.getTargetParentId())
                     ||
-                    userFolderService.getBaseMapper().getFolderChildren(group.folderIds(), userId).contains(request.getParentId())
+                    userFolderService.getFolderChildren(group.folderIds(), userId).contains(request.getTargetParentId())
                 ) {
                 throw new BusinessException(0, "不能将文件夹移动到自身或其子文件夹");
             }
-            moveFolders.forEach(folder -> folder.setParentId(request.getParentId()));
-            List<UserFolder> folders = userFolderService.resolveNameConflicts(moveFolders, userId, request.getParentId());
+            moveFolders.forEach(folder -> folder.setParentId(request.getTargetParentId()));
+            List<UserFolder> folders = userFolderService.resolveNameConflicts(moveFolders, userId, request.getTargetParentId());
 
             userFolderService.updateBatchById(folders);
+            // 目标缓存
+            cache.evictDirectoryCache(request.getTargetParentId());
+            // 源缓存
+            Long parentId = folders.get(0).getParentId();
+            cache.evictDirectoryCache(parentId);
         }
     }
 
     // ====== Delete ======
     @Override
+    @GlobalTransactional(rollbackFor = Exception.class)  // 若需跨服务配额回退
     @Transactional
     public void deletePermanently(DeleteRequest request, Long userId) {
         ItemGroup group = ItemGroup.from(request.getItems());
 
-        // 1. 处理文件删除及物理文件引用减少
-        if (!group.fileIds().isEmpty()) {
-            // 查询待删除的 UserFile 记录（包含 fileId 字段）
-            List<UserFile> userFiles = userFileService.list(
-                    new LambdaQueryWrapper<UserFile>()
-                            .eq(UserFile::getUserId, userId)
-                            .in(UserFile::getId, group.fileIds())
-                            .isNotNull(UserFile::getDeletedAt)
-            );
-            if (!userFiles.isEmpty()) {
-                // 收集所有物理文件 ID（去重）
-                Set<Long> physicalFileIds = userFiles.stream()
-                        .map(UserFile::getPhysicalId)
-                        .filter(Objects::nonNull)
-                        .collect(Collectors.toSet());
-
-                // 减少每个物理文件的引用计数（若引用归零则物理删除）
-                filePhysicalService.decreaseRef(physicalFileIds);
-
-                // 删除 UserFile 记录
-                userFileService.remove(
-                        new LambdaQueryWrapper<UserFile>()
-                                .eq(UserFile::getUserId, userId)
-                                .in(UserFile::getId, group.fileIds())
-                                .isNotNull(UserFile::getDeletedAt)
-                );
-            }
-        }
-
-        // 2. 处理文件夹删除（文件夹本身不关联物理文件，暂无需额外操作）
+        // 1. 校验顶层文件夹是否在回收站（deleted_at IS NOT NULL）
+        Set<Long> validTopFolderIds = Collections.emptySet();
         if (!group.folderIds().isEmpty()) {
-            userFolderService.remove(
+            List<UserFolder> validFolders = userFolderService.list(
                     new LambdaQueryWrapper<UserFolder>()
                             .eq(UserFolder::getUserId, userId)
                             .in(UserFolder::getId, group.folderIds())
                             .isNotNull(UserFolder::getDeletedAt)
             );
+            validTopFolderIds = validFolders.stream().map(UserFolder::getId).collect(Collectors.toSet());
+        }
+
+        // 2. 获取所有子文件夹（含顶层）—— 无 deleted_at 过滤，物理删除所有子孙
+        Set<Long> allFolderIds = new HashSet<>(validTopFolderIds);
+        if (!validTopFolderIds.isEmpty()) {
+            allFolderIds.addAll(userFolderService.getFolderChildren(new ArrayList<>(validTopFolderIds), userId));
+        }
+
+        // 3. 获取所有子文件（含子文件夹下的文件）
+        Set<Long> allFileIds = new HashSet<>();
+        if (!validTopFolderIds.isEmpty()) {
+            allFileIds.addAll(userFileService.getFileChildren(new ArrayList<>(validTopFolderIds), userId));
+        }
+
+        // 4. 添加用户直接指定的文件（仅限在回收站中的）
+        if (!group.fileIds().isEmpty()) {
+            List<UserFile> validFiles = userFileService.list(
+                    new LambdaQueryWrapper<UserFile>()
+                            .eq(UserFile::getUserId, userId)
+                            .in(UserFile::getId, group.fileIds())
+                            .isNotNull(UserFile::getDeletedAt)
+            );
+            allFileIds.addAll(validFiles.stream().map(UserFile::getId).collect(Collectors.toSet()));
+        }
+
+        // 5. 处理文件删除（物理文件引用计数 + 配额回退）
+        if (!allFileIds.isEmpty()) {
+            List<UserFile> userFiles = userFileService.list(
+                    new LambdaQueryWrapper<UserFile>()
+                            .eq(UserFile::getUserId, userId)
+                            .in(UserFile::getId, allFileIds)
+            );
+            if (!userFiles.isEmpty()) {
+                // 收集物理文件 ID
+                Map<Long, Long> physicalIdToDeleteCount = userFiles.stream()
+                        .map(UserFile::getPhysicalId)
+                        .filter(Objects::nonNull)
+                        .collect(Collectors.groupingBy(Function.identity(), Collectors.counting()));
+
+                // 减少引用计数
+                if (!physicalIdToDeleteCount.isEmpty()) {
+                    filePhysicalService.decreaseRef(physicalIdToDeleteCount);
+                }
+
+                // 计算总大小并回退配额
+                long totalSize = userFiles.stream().mapToLong(UserFile::getSize).sum();
+                boolean quotaSuccess = quotaDubboService.subtractUsedQuota(userId, totalSize);
+                if (!quotaSuccess) {
+                    throw new BusinessException(0,"配额回退失败");
+                }
+
+                // 删除 UserFile 记录
+                userFileService.remove(
+                        new LambdaQueryWrapper<UserFile>()
+                                .eq(UserFile::getUserId, userId)
+                                .in(UserFile::getId, allFileIds)
+                );
+            }
+            registerDeleteEvent(allFileIds, userId, FileItemType.FILE);
+        }
+
+        // 6. 删除文件夹记录
+        if (!allFolderIds.isEmpty()) {
+            userFolderService.remove(
+                    new LambdaQueryWrapper<UserFolder>()
+                            .eq(UserFolder::getUserId, userId)
+                            .in(UserFolder::getId, allFolderIds)
+            );
+            registerDeleteEvent(allFolderIds, userId, FileItemType.FOLDER);
+        }
+    }
+
+    /**
+     * @param ids
+     * @param type
+     */
+    @Override
+    public void deleteDocuments(Collection<Long> ids, FileItemType type) {
+        if (ids == null || ids.isEmpty()) {
+            return;
+        }
+
+        // 1. 根据类型确定前缀
+        String prefix = (type == FileItemType.FILE) ? "file_" : "folder_";
+
+        // 2. 拼接主键列表
+        List<String> searchIds = ids.stream()
+                .map(id -> prefix + id)
+                .collect(Collectors.toList());
+
+        // 3. 分批删除（Meilisearch 对单次请求体大小有限制，建议每批 1000 条）
+        int batchSize = 1000;
+        for (int i = 0; i < searchIds.size(); i += batchSize) {
+            int end = Math.min(i + batchSize, searchIds.size());
+            List<String> batch = searchIds.subList(i, end);
+
+            // 调用 Repository 或直接使用 Meilisearch 客户端的批量删除 API
+            fileSearchRepository.deleteDocuments(batch);
+
+            log.info("批量删除索引成功，批次：{}-{}，共 {} 条", i, end - 1, batch.size());
         }
     }
 
@@ -446,6 +692,11 @@ public class FileManagerServiceImpl implements FileManagerService {
                             .isNull(UserFile::getDeletedAt)
                             .set(UserFile::getDeletedAt, LocalDateTime.now())
             );
+            UserFile one = userFileService.getOne(
+                    new LambdaQueryWrapper<UserFile>()
+                            .eq(UserFile::getId, group.fileIds().get(0))
+            );
+            cache.evictDirectoryCache(one.getParentId());
         }
         if (!group.folderIds().isEmpty()) {
             userFolderService.update(
@@ -455,6 +706,11 @@ public class FileManagerServiceImpl implements FileManagerService {
                             .isNull(UserFolder::getDeletedAt)
                             .set(UserFolder::getDeletedAt, LocalDateTime.now())
             );
+            UserFolder one = userFolderService.getOne(
+                    new LambdaQueryWrapper<UserFolder>()
+                            .eq(UserFolder::getId, group.folderIds().get(0))
+            );
+            cache.evictDirectoryCache(one.getParentId());
         }
     }
 
@@ -527,5 +783,111 @@ public class FileManagerServiceImpl implements FileManagerService {
         VirtualFileVO vo = new VirtualFileVO();
         BeanUtils.copyProperties(doc, vo);
         return vo;
+    }
+
+    private void registerDeleteEvent(Set<Long> ids, Long userId, FileItemType type) {
+        TransactionHookManager.registerHook(new TransactionHook() {
+            @Override
+            public void afterCommit() {
+                sendDeleteEvent(ids, userId, type);
+            }
+
+            @Override
+            public void beforeRollback() {
+            }
+
+            @Override
+            public void beforeBegin() {
+            }
+
+            @Override
+            public void afterBegin() {
+            }
+
+            @Override
+            public void beforeCommit() {
+            }
+
+            @Override
+            public void afterRollback() {
+            }
+
+            @Override
+            public void afterCompletion() {
+            }
+        });
+    }
+
+    private void sendDeleteEvent(Set<Long> fileId, Long userId, FileItemType type) {
+        FileDeleteEvent event = FileDeleteEvent.builder()
+                .ids(fileId)
+                .userId(userId)
+                .type(type)
+                .build();
+        rabbitTemplate.convertAndSend(EXCHANGE_NAME, "file.deleted", event);
+    }
+
+
+    private void sendRenameEvent(Set<Long> fileId, Long userId, FileItemType type) {
+        FileDeleteEvent event = FileDeleteEvent.builder()
+                .ids(fileId)
+                .userId(userId)
+                .type(type)
+                .build();
+        rabbitTemplate.convertAndSend(EXCHANGE_NAME, "file.rename", event);
+    }
+
+    private FileDocument buildFileDocument(UserFile file) {
+        FileDocument doc = new FileDocument();
+        doc.setSearchId("file_" + file.getId());
+        doc.setId(file.getId());
+        doc.setType(FileItemType.FILE);
+        doc.setStatus(0);
+        doc.setName(file.getName());
+        doc.setParentId(file.getParentId());
+        doc.setSize(file.getSize() != null ? file.getSize() : 0L);
+        doc.setUserId(file.getUserId());
+        doc.setUpdateTime(file.getUpdateTime());
+
+        // 解析文件名，分离纯名和扩展名
+        parseFileName(doc, file.getName());
+
+        // contentPreview 可后续异步填充
+        return doc;
+    }
+
+    private FileDocument buildFolderDocument(UserFolder folder) {
+        FileDocument doc = new FileDocument();
+        doc.setSearchId("folder_" + folder.getId());
+        doc.setId(folder.getId());
+        doc.setType(FileItemType.FOLDER);
+        doc.setStatus(0);
+        doc.setName(folder.getName());
+        doc.setParentId(folder.getParentId());
+        doc.setSize(0L);
+        doc.setUserId(folder.getUserId());
+        doc.setUpdateTime(folder.getUpdateTime());
+
+        // 文件夹无扩展名，纯名就是文件夹名
+        doc.setNamePure(folder.getName());
+        doc.setExtension(null);
+        return doc;
+    }
+
+    private void parseFileName(FileDocument doc, String fileName) {
+        if (StringUtils.isBlank(fileName)) {
+            doc.setNamePure(fileName);
+            doc.setExtension(null);
+            return;
+        }
+        int lastDot = fileName.lastIndexOf('.');
+        if (lastDot > 0) {   // 有扩展名，且不在首位
+            doc.setNamePure(fileName.substring(0, lastDot));
+            doc.setExtension(fileName.substring(lastDot + 1));
+        } else {
+            // 无扩展名（如隐藏文件 .gitignore 被视作纯名）
+            doc.setNamePure(fileName);
+            doc.setExtension(null);
+        }
     }
 }
