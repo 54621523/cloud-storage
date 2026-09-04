@@ -293,8 +293,6 @@ export function useFileExplorer(
         }));
 
         await deleteMutation.mutateAsync({ data: { items: identities } });
-        selection.clear();
-        ElMessage.success(`成功删除 ${items.length} 项`);
         refresh();
         queryClient.invalidateQueries({ queryKey: QUERY_KEYS.recycle });
     }

@@ -5,6 +5,7 @@ import com.baomidou.mybatisplus.core.metadata.IPage;
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import com.baomidou.mybatisplus.extension.service.impl.ServiceImpl;
 import com.fasterxml.jackson.core.JsonProcessingException;
+import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import demo.cloud.common.exception.BusinessException;
 import demo.cloud.common.pojo.PageResult;
@@ -23,24 +24,31 @@ import demo.cloud.share.dto.ShareLinkVO;
 import demo.cloud.share.dto.TransferRequest;
 import demo.cloud.share.mapper.ShareLinkItemMapper;
 import demo.cloud.share.mapper.ShareLinkMapper;
+import demo.cloud.share.mq.DelayedRabbitConfig;
 import demo.cloud.share.pojo.ShareLink;
 import demo.cloud.share.pojo.ShareLinkItem;
 import demo.cloud.share.service.ShareService;
 import lombok.AllArgsConstructor;
 import lombok.Data;
+import lombok.NoArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.dubbo.config.annotation.DubboReference;
 import org.apache.seata.spring.annotation.GlobalTransactional;
+import org.springframework.amqp.rabbit.core.RabbitTemplate;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.data.redis.core.RedisTemplate;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.transaction.support.TransactionSynchronization;
+import org.springframework.transaction.support.TransactionSynchronizationManager;
 
 import java.time.Duration;
 import java.time.LocalDateTime;
 import java.util.*;
+import java.util.concurrent.ThreadLocalRandom;
+import java.util.concurrent.TimeUnit;
 import java.util.stream.Collectors;
 
 @Slf4j
@@ -54,32 +62,39 @@ public class ShareServiceImpl extends ServiceImpl<ShareLinkMapper, ShareLink> im
     private final PasswordEncoder passwordEncoder;
     private final ObjectMapper objectMapper;
 
+    private final RabbitTemplate rabbitTemplate;
+
     @DubboReference(timeout = 3000)
     private FileDubboService fileDubboService;
 
     @DubboReference
     private UserFolderDubboService userFolderDubboService;
 
+
+
     @Autowired
     private RedisTemplate<String, Object> redisTemplate;
 
     // ====== Constants ======
-    private static final int MAX_PASSWORD_ATTEMPTS = 5;
-    private static final Duration LOCK_DURATION = Duration.ofMinutes(15);
-
     private static final String SHARE_CACHE_PREFIX = "share:valid:";
     private static final long CACHE_TTL_SECONDS = 7200;
+
+    private static final String NULL_VALUE = "NULL";
+    private static final int BASE_TTL_SECONDS = 600;      //
+    private static final int RANDOM_TTL_OFFSET = 120;     //
 
     // ====== Constructor ======
     public ShareServiceImpl(JwtUtil jwtUtil,
                             ShareLinkMapper shareLinkMapper,
                             ShareLinkItemMapper shareLinkItemMapper,
-                            PasswordEncoder passwordEncoder, ObjectMapper objectMapper) {
+                            PasswordEncoder passwordEncoder, ObjectMapper objectMapper,
+                            RabbitTemplate rabbitTemplate) {
         this.jwtUtil = jwtUtil;
         this.shareLinkMapper = shareLinkMapper;
         this.shareLinkItemMapper = shareLinkItemMapper;
         this.passwordEncoder = passwordEncoder;
         this.objectMapper = objectMapper;
+        this.rabbitTemplate = rabbitTemplate;
     }
 
     // ========================================
@@ -101,8 +116,7 @@ public class ShareServiceImpl extends ServiceImpl<ShareLinkMapper, ShareLink> im
         shareLink.setUserId(userId);
         // 密码加密存储
         if (StringUtils.isNotBlank(request.getPassword())) {
-            String encodedPassword = passwordEncoder.encode(request.getPassword());
-            shareLink.setPassword(encodedPassword);
+            shareLink.setPassword(request.getPassword());
             response.setPassword(request.getPassword());
         } else {
             shareLink.setPassword(null);
@@ -127,7 +141,29 @@ public class ShareServiceImpl extends ServiceImpl<ShareLinkMapper, ShareLink> im
             return linkItem;
         }).toList();
         shareLinkItemMapper.insert(items);
+        TransactionSynchronizationManager.registerSynchronization(
+                new TransactionSynchronization() {
+                    @Override
+                    public void afterCommit() {
+                        // 发送延迟消息，延迟时间 = expireTime - now()
+                        if (shareLink.getExpireTime() != null) {
+                            long delayMs = Duration.between(LocalDateTime.now(), shareLink.getExpireTime()).toMillis();
 
+                            if (delayMs > 0) {
+                                rabbitTemplate.convertAndSend(
+                                        DelayedRabbitConfig.DELAYED_EXCHANGE,
+                                        DelayedRabbitConfig.DELAYED_ROUTING_KEY,
+                                        shareLink.getShareCode(),
+                                        message -> {
+                                            message.getMessageProperties().setHeader("x-delay", delayMs);
+                                            return message;
+                                        }
+                                );
+                            }
+                        }
+                    }
+                }
+        );
         return response;
     }
 
@@ -144,18 +180,43 @@ public class ShareServiceImpl extends ServiceImpl<ShareLinkMapper, ShareLink> im
         }
 
         // 密码验证
-        String storedPasswordHash = validShareInfo.getPasswordHash();
-        if (StringUtils.isNotBlank(storedPasswordHash)) {
+        String storedPassword = validShareInfo.getPassword();
+        if (StringUtils.isNotBlank(storedPassword)) {
             if (StringUtils.isBlank(password)) {
                 throw new BusinessException(ResultCode.SHARE_PASSWORD_REQUIRED);
             }
-            boolean passwordMatch = passwordEncoder.matches(password, storedPasswordHash);
+            boolean passwordMatch = password.equals(storedPassword);
 
             if (!passwordMatch) {
                 throw new BusinessException(ResultCode.SHARE_PASSWORD_ERROR);
             }
         }
         return jwtUtil.generateShareToken(shareCode);
+    }
+
+    /**
+     * @param id
+     * @param userId
+     */
+    @Override
+    public void deleteShareLink(Long id, Long userId) {
+        boolean exist = shareLinkMapper.exists(
+                new LambdaQueryWrapper<ShareLink>()
+                        .eq(ShareLink::getUserId, userId)
+                        .eq(ShareLink::getId, id)
+        );
+        if(!exist){
+            return;
+        }
+        shareLinkMapper.delete(
+                new LambdaQueryWrapper<ShareLink>()
+                        .eq(ShareLink::getUserId, userId)
+                        .eq(ShareLink::getId, id)
+        );
+        shareLinkItemMapper.delete(
+                new LambdaQueryWrapper<ShareLinkItem>()
+                        .eq(ShareLinkItem::getShareId, id)
+        );
     }
 
     @Override
@@ -167,16 +228,35 @@ public class ShareServiceImpl extends ServiceImpl<ShareLinkMapper, ShareLink> im
         IPage<ShareLinkVO> pageResult = shareLinkMapper.selectShareLinkVO(page, userId);
         return PageResult.of(pageResult);
     }
+    private String buildCacheKey(String shareCode, Long rootId, Long parentId) {
+        return String.format("share:info:%s:%d:%d", shareCode, rootId, parentId);
+    }
 
     @Override
     public List<VirtualFileVO> getShareInfo(String shareToken, Long parentId, Long rootId) {
+
         // 1. 验证分享 Token
         String shareCode = jwtUtil.getShareCodeFromToken(shareToken);
         ShareCacheEntity validShareInfo = getValidShareInfo(shareCode);
         Long linkId = validShareInfo.getId();
+        String cacheKey = buildCacheKey(shareCode, rootId, parentId);
         if (linkId == null) {
+            redisTemplate.opsForValue().set(cacheKey, NULL_VALUE, 2, TimeUnit.MINUTES);
             throw new BusinessException(ResultCode.SHARE_NOT_FOUND);
         }
+
+        String cachedJson = (String) redisTemplate.opsForValue().get(cacheKey);
+        if (cachedJson != null) {
+            try {
+                // 使用 Jackson 反序列化
+                log.info("命中缓存");
+                return objectMapper.readValue(cachedJson, new TypeReference<List<VirtualFileVO>>() {});
+            } catch (JsonProcessingException e) {
+                log.error("反序列化缓存失败，缓存 Key: {}", cacheKey, e);
+                redisTemplate.delete(cacheKey);
+            }
+        }
+
 
         // 2. 进入分享页面的虚拟根目录
         if (rootId == 0) {
@@ -194,9 +274,21 @@ public class ShareServiceImpl extends ServiceImpl<ShareLinkMapper, ShareLink> im
                         .eq(ShareLinkItem::getTargetId, rootId)
         );
         if (!exists) {
+            redisTemplate.opsForValue().set(cacheKey, NULL_VALUE, 2, TimeUnit.MINUTES);
             throw new BusinessException(ResultCode.SHARE_NOT_PERMISSION);
         }
-        return fileDubboService.listWithParentId(parentId, rootId);
+        List<VirtualFileVO> result = fileDubboService.listWithParentId(parentId, rootId);
+        if(result == null || result.isEmpty()){
+
+        }
+        try {
+            String json = objectMapper.writeValueAsString(result);
+            long ttl = BASE_TTL_SECONDS + ThreadLocalRandom.current().nextInt(-RANDOM_TTL_OFFSET, RANDOM_TTL_OFFSET + 1);
+            redisTemplate.opsForValue().set(cacheKey, json, Duration.ofSeconds(Math.max(ttl, 1)));
+        } catch (JsonProcessingException e) {
+            log.error("序列化缓存失败", e);
+        }
+        return result;
     }
 
     @Override
@@ -262,18 +354,30 @@ public class ShareServiceImpl extends ServiceImpl<ShareLinkMapper, ShareLink> im
         if (rootId == 0) {
             // 分支 A：根视图过滤
             ItemGroup group = ItemGroup.from(requestItems);
-            List<ShareLinkItem> hitItems = shareLinkItemMapper.selectList(
-                    new LambdaQueryWrapper<ShareLinkItem>()
-                            .eq(ShareLinkItem::getShareId, linkId)
-                            .and(w -> w
-                                    .in(ShareLinkItem::getTargetId, group.fileIds())
-                                    .eq(ShareLinkItem::getTargetType, FileItemType.FILE)
-                                    .or()
-                                    .in(ShareLinkItem::getTargetId, group.folderIds())
-                                    .eq(ShareLinkItem::getTargetType, FileItemType.FOLDER)
-                            )
-                            .select(ShareLinkItem::getTargetId, ShareLinkItem::getTargetType)
-            );
+            LambdaQueryWrapper<ShareLinkItem> wrapper = new LambdaQueryWrapper<ShareLinkItem>()
+                            .eq(ShareLinkItem::getShareId, linkId);
+            wrapper.and(w -> {
+                boolean hasFiles = !group.fileIds().isEmpty();
+                boolean hasFolders = !group.folderIds().isEmpty();
+                if (!hasFiles && !hasFolders) {
+                    w.apply("1=0"); // 无条件返回空
+                    return;
+                }
+                // 先处理文件部分
+                if (hasFiles) {
+                    w.in(ShareLinkItem::getTargetId, group.fileIds())
+                            .eq(ShareLinkItem::getTargetType, FileItemType.FILE);
+                }
+                // 再通过 or 连接文件夹部分
+                if (hasFolders) {
+                    if (hasFiles) {
+                        w.or();
+                    }
+                    w.in(ShareLinkItem::getTargetId, group.folderIds())
+                            .eq(ShareLinkItem::getTargetType, FileItemType.FOLDER);
+                }
+            });
+            List<ShareLinkItem> hitItems = shareLinkItemMapper.selectList(wrapper);
 
             Set<ItemIdentity> validSet = hitItems.stream()
                     .map(item -> new ItemIdentity(item.getTargetId(), item.getTargetType()))
@@ -303,10 +407,6 @@ public class ShareServiceImpl extends ServiceImpl<ShareLinkMapper, ShareLink> im
     // ====== DELETE ======
     // ========================================
 
-    // 目前暂无删除分享链接的接口，后续可在此扩展：
-    // public void deleteShare(Long shareId, Long userId) { ... }
-    // public void cancelShare(String shareCode, Long userId) { ... }
-
     // ========================================
     // ====== PRIVATE METHODS ======
     // ========================================
@@ -316,7 +416,7 @@ public class ShareServiceImpl extends ServiceImpl<ShareLinkMapper, ShareLink> im
     }
 
     /**
-     * 获取有效的分享链接缓存实体（含密码哈希）
+     * 获取有效的分享链接缓存实体
      * @return 有效实体，若无效返回 null
      */
     public ShareCacheEntity getValidShareInfo(String shareCode) {
@@ -402,28 +502,11 @@ public class ShareServiceImpl extends ServiceImpl<ShareLinkMapper, ShareLink> im
 
     @Data
     @AllArgsConstructor
+    @NoArgsConstructor
     private static class ShareCacheEntity {
         private Long id;
         private LocalDateTime expireTime;
         private ShareStatus status;
-        private String passwordHash;
+        private String password;
     }
-
-//    private void checkPasswordAttempts(String shareCode) {
-//        String key = "share:password:attempts:" + shareCode;
-//        Integer attempts = passwordRedisTemplate.opsForValue().get(key);
-//        if (attempts != null && attempts >= MAX_PASSWORD_ATTEMPTS) {
-//            throw new BusinessException(ResultCode.TOO_MANY_PASSWORD_ATTEMPTS);
-//        }
-//    }
-//
-//    private void recordPasswordAttempt(String shareCode, boolean success) {
-//        String key = "share:password:attempts:" + shareCode;
-//        if (success) {
-//            passwordRedisTemplate.delete(key);
-//        } else {
-//            passwordRedisTemplate.opsForValue().increment(key);
-//            passwordRedisTemplate.expire(key, LOCK_DURATION);
-//        }
-//    }
 }

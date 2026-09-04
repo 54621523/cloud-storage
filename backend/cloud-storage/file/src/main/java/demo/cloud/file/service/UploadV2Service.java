@@ -37,6 +37,9 @@ import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.stream.Collectors;
 
+import static demo.cloud.file.mq.RabbitExchangeConfig.EXCHANGE_NAME;
+import static demo.cloud.file.mq.RabbitExchangeConfig.UPLOAD_EVENT;
+
 @Slf4j
 @Service
 @RequiredArgsConstructor
@@ -45,7 +48,6 @@ public class UploadV2Service {
     // ====== Constants ======
     private static final long DEFAULT_CHUNK_SIZE = 5 * 1024 * 1024;
     private static final String BUCKET_NAME = "documents";
-    private static final String EXCHANGE_NAME = "file.exchange";
     private static final String ROUTING_KEY = "file.process";
     private static final DateTimeFormatter DATE_PATH_FORMATTER =
             DateTimeFormatter.ofPattern("yyyy/MM/dd");
@@ -86,12 +88,17 @@ public class UploadV2Service {
 
     }
 
-    @Transactional(rollbackFor = Exception.class)
+    @GlobalTransactional(rollbackFor = Exception.class)
     public InitResponseV2 doInitUpload(InitRequestV2 request, Long userId, Long parentId) {
         long fileSize = request.getFileSize();
+        //  0字节文件
+        long step4Start = System.currentTimeMillis();
+        if (fileSize == 0) {
+            throw new BusinessException(0,"不可上传没有大小的文件");
+        }
+        log.info("0字节文件处理耗时: {} ms", System.currentTimeMillis() - step4Start);
 
-
-        // 1. 秒传判断
+        // 秒传判断
         long step3Start = System.currentTimeMillis();
         if (request.getFileHash() != null) {
             FilePhysical existing = filePhysicalService.getOne(
@@ -102,21 +109,17 @@ public class UploadV2Service {
             if (existing != null) {
                 filePhysicalService.increaseRef(existing.getId());
                 userFileService.createUserFile(userId, parentId, request.getFileName(), fileSize, existing.getId());
+                Long actualFileSize = existing.getSize();
+                boolean success = quotaDubboService.addUsedQuota(userId, actualFileSize);
+                if(!success){
+                    throw new BusinessException(0,"配额增加失败");
+                }
                 return InitResponseV2.builder().isComplete(true).build();
             }
         }
-        log.info("【步骤3】秒传查询耗时: {} ms（未命中）", System.currentTimeMillis() - step3Start);
+        log.info("秒传查询耗时: {} ms（未命中）", System.currentTimeMillis() - step3Start);
 
-        // 2. 0字节文件
-        long step4Start = System.currentTimeMillis();
-        if (fileSize == 0) {
-            Long physicalId = filePhysicalService.getOrCreatePhysicalId(
-                    "d41d8cd98f00b204e9800998ecf8427e", 0L, null
-            );
-            userFileService.createUserFile(userId, parentId, request.getFileName(), 0L, physicalId);
-            return InitResponseV2.builder().isComplete(true).build();
-        }
-        log.info("【步骤4】0字节文件处理耗时: {} ms", System.currentTimeMillis() - step4Start);
+
 
         // 3. 正常分片上传初始化
         long step5Start = System.currentTimeMillis();
@@ -496,7 +499,7 @@ public class UploadV2Service {
                 .userId(userId)
                 .uploadId(uploadId)
                 .build();
-        rabbitTemplate.convertAndSend(EXCHANGE_NAME, ROUTING_KEY, event);
+        rabbitTemplate.convertAndSend(EXCHANGE_NAME, UPLOAD_EVENT, event);
     }
 
 

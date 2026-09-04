@@ -38,6 +38,10 @@ import java.util.concurrent.ThreadLocalRandom;
 import java.util.function.Function;
 import java.util.stream.Collectors;
 
+import static demo.cloud.file.mq.RabbitExchangeConfig.EXCHANGE_NAME;
+import static demo.cloud.file.listener.FileIndexConsumer.DELETE_EVENT;
+import static demo.cloud.file.listener.FileIndexConsumer.RENAME_EVENT;
+
 @Service
 @Slf4j
 @RequiredArgsConstructor
@@ -52,7 +56,6 @@ public class FileManagerServiceImpl implements FileManagerService {
     private final UserQuotaDubboService quotaDubboService;
 
     private final RabbitTemplate rabbitTemplate;
-    private static final String EXCHANGE_NAME = "file.exchange";
 
 
     private final FileSearchRepository fileSearchRepository;
@@ -60,7 +63,7 @@ public class FileManagerServiceImpl implements FileManagerService {
     private final RedisTemplate<String, Object> redisTemplate;
     private static final String DIR_CACHE_PREFIX = "dir:members:";
     private static final long BASE_TTL_SECONDS = 600;       // 10分钟
-    private static final int OFFSET_SECONDS = 120;          // 随机偏移 ±2分钟
+    private static final int RANDOM_TTL_OFFSET = 120;          // 随机偏移 ±2分钟
 
     // ====== Create ======
 
@@ -74,7 +77,7 @@ public class FileManagerServiceImpl implements FileManagerService {
         folder.setUserId(userId);
         try{
             userFolderService.saveFolder(folder);
-            cache.evictDirectoryCache(request.getParentId());
+            cache.evictDirectoryCache(request.getParentId(), userId);
         }catch (DuplicateKeyException e) {
             throw new BusinessException(0, "该目录下已存在同名文件夹");
         }
@@ -243,17 +246,23 @@ public class FileManagerServiceImpl implements FileManagerService {
      * 获取指定目录下的虚拟文件列表
      */
     public List<VirtualFileVO> getVirtualFileList(Long parentId, Long userId) {
-
-        String cacheKey = DIR_CACHE_PREFIX + ":" + parentId;
+        String cacheKey;
+        if (userId != null) {
+            cacheKey = DIR_CACHE_PREFIX + ":" + userId + ":" + parentId;
+        } else {
+            // 匿名访问
+            cacheKey = null;
+        }
         String cachedJson = (String) redisTemplate.opsForValue().get(cacheKey);
         if (cachedJson != null) {
             try {
                 // 使用 Jackson 反序列化
+                log.info("命中缓存");
                 return objectMapper.readValue(cachedJson, new TypeReference<List<VirtualFileVO>>() {});
             } catch (JsonProcessingException e) {
                 log.error("反序列化缓存失败，缓存 Key: {}", cacheKey, e);
                 // 损坏的缓存直接删除，避免反复出错
-                cache.evictDirectoryCache(parentId);
+                cache.evictDirectoryCache(parentId, userId);
             }
         }
 
@@ -279,7 +288,7 @@ public class FileManagerServiceImpl implements FileManagerService {
         List<VirtualFileVO> result = mergeAndConvert(folders, files);
         try {
             String json = objectMapper.writeValueAsString(result);
-            long ttl = BASE_TTL_SECONDS + ThreadLocalRandom.current().nextInt(-OFFSET_SECONDS, OFFSET_SECONDS + 1);
+            long ttl = BASE_TTL_SECONDS + ThreadLocalRandom.current().nextInt(-RANDOM_TTL_OFFSET, RANDOM_TTL_OFFSET + 1);
             redisTemplate.opsForValue().set(cacheKey, json, Duration.ofSeconds(Math.max(ttl, 1)));
         } catch (JsonProcessingException e) {
             log.error("序列化缓存失败", e);
@@ -421,7 +430,7 @@ public class FileManagerServiceImpl implements FileManagerService {
             userFolderService.updateBatchById(resolvedFolders);
         }
         for (Long parentId : parentIdsToEvict) {
-            cache.evictDirectoryCache(parentId);
+            cache.evictDirectoryCache(parentId, userId);
         }
     }
 
@@ -475,7 +484,8 @@ public class FileManagerServiceImpl implements FileManagerService {
                             .eq(UserFile::getId, request.getId())
                             .isNull(UserFile::getDeletedAt)
             );
-            cache.evictDirectoryCache(one.getParentId());
+            cache.evictDirectoryCache(one.getParentId(), userId);
+            sendRenameEvent(Set.of(one.getId()),userId, FileItemType.FILE);
             return;
         }
         if (request.getType().equals(FileItemType.FOLDER)) {
@@ -498,7 +508,8 @@ public class FileManagerServiceImpl implements FileManagerService {
                             .eq(UserFolder::getId, request.getId())
                             .isNull(UserFolder::getDeletedAt)
             );
-            cache.evictDirectoryCache(one.getParentId());
+            cache.evictDirectoryCache(one.getParentId(), userId);
+            sendRenameEvent(Set.of(one.getId()),userId, FileItemType.FOLDER);
             return;
         }
 
@@ -527,10 +538,10 @@ public class FileManagerServiceImpl implements FileManagerService {
 
             userFileService.updateBatchById(files);
             // 目标目录清除
-            cache.evictDirectoryCache(request.getTargetParentId());
+            cache.evictDirectoryCache(request.getTargetParentId(), userId);
             // 源目录清除
             Long parentId = files.get(0).getParentId();
-            cache.evictDirectoryCache(parentId);
+            cache.evictDirectoryCache(parentId, userId);
         }
         if (!group.folderIds().isEmpty()) {
             List<UserFolder> moveFolders = userFolderService.list(
@@ -553,17 +564,16 @@ public class FileManagerServiceImpl implements FileManagerService {
 
             userFolderService.updateBatchById(folders);
             // 目标缓存
-            cache.evictDirectoryCache(request.getTargetParentId());
+            cache.evictDirectoryCache(request.getTargetParentId(), userId);
             // 源缓存
             Long parentId = folders.get(0).getParentId();
-            cache.evictDirectoryCache(parentId);
+            cache.evictDirectoryCache(parentId, userId);
         }
     }
 
     // ====== Delete ======
     @Override
-    @GlobalTransactional(rollbackFor = Exception.class)  // 若需跨服务配额回退
-    @Transactional
+    @GlobalTransactional(rollbackFor = Exception.class)
     public void deletePermanently(DeleteRequest request, Long userId) {
         ItemGroup group = ItemGroup.from(request.getItems());
 
@@ -696,7 +706,7 @@ public class FileManagerServiceImpl implements FileManagerService {
                     new LambdaQueryWrapper<UserFile>()
                             .eq(UserFile::getId, group.fileIds().get(0))
             );
-            cache.evictDirectoryCache(one.getParentId());
+            cache.evictDirectoryCache(one.getParentId(), userId);
         }
         if (!group.folderIds().isEmpty()) {
             userFolderService.update(
@@ -710,7 +720,7 @@ public class FileManagerServiceImpl implements FileManagerService {
                     new LambdaQueryWrapper<UserFolder>()
                             .eq(UserFolder::getId, group.folderIds().get(0))
             );
-            cache.evictDirectoryCache(one.getParentId());
+            cache.evictDirectoryCache(one.getParentId(), userId);
         }
     }
 
@@ -824,7 +834,7 @@ public class FileManagerServiceImpl implements FileManagerService {
                 .userId(userId)
                 .type(type)
                 .build();
-        rabbitTemplate.convertAndSend(EXCHANGE_NAME, "file.deleted", event);
+        rabbitTemplate.convertAndSend(EXCHANGE_NAME, DELETE_EVENT, event);
     }
 
 
@@ -834,7 +844,7 @@ public class FileManagerServiceImpl implements FileManagerService {
                 .userId(userId)
                 .type(type)
                 .build();
-        rabbitTemplate.convertAndSend(EXCHANGE_NAME, "file.rename", event);
+        rabbitTemplate.convertAndSend(EXCHANGE_NAME, RENAME_EVENT, event);
     }
 
     private FileDocument buildFileDocument(UserFile file) {

@@ -18,6 +18,8 @@ public interface ShareService extends IService<ShareLink> {
 
     String verifyShare(String shareCode, String password);
 
+    void deleteShareLink(Long id, Long userId);
+
     List<VirtualFileVO> getShareInfo(String shareToken, Long parentId, Long rootId);
 
     String generateDownloadUrl(String shareToken, Long targetId, Long rootId);

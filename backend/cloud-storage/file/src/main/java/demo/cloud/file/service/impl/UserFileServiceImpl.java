@@ -25,6 +25,9 @@ import java.util.*;
 import java.util.concurrent.TimeUnit;
 import java.util.stream.Collectors;
 
+import static demo.cloud.file.listener.FileIndexConsumer.SAVED_EVENT;
+import static demo.cloud.file.mq.RabbitExchangeConfig.EXCHANGE_NAME;
+
 @Slf4j
 @Service
 public class UserFileServiceImpl extends ServiceImpl<UserFileMapper, UserFile> implements UserFileService {
@@ -32,8 +35,6 @@ public class UserFileServiceImpl extends ServiceImpl<UserFileMapper, UserFile> i
     private final UserFileMapper userFileMapper;
     private final RedissonClient redissonClient;
     private final RabbitTemplate rabbitTemplate;
-    private static final String EXCHANGE_NAME = "file.exchange";
-    private static final String ROUTING_KEY = "file.process";
     private final CacheInvalidationHelper cache;
     // 注入自身的代理对象（使用 @Lazy 避免循环依赖）
     @Lazy
@@ -45,16 +46,6 @@ public class UserFileServiceImpl extends ServiceImpl<UserFileMapper, UserFile> i
         this.redissonClient = redissonClient;
         this.rabbitTemplate = rabbitTemplate;
         this.cache = cache;
-    }
-
-
-    public boolean isOwner(Long userFileId, Long userId) {
-        if (userFileId == null || userId == null) return false;
-        return userFileMapper.exists(
-                new LambdaQueryWrapper<UserFile>()
-                        .eq(UserFile::getId, userFileId)
-                        .eq(UserFile::getUserId, userId)
-        );
     }
 
 
@@ -107,19 +98,6 @@ public class UserFileServiceImpl extends ServiceImpl<UserFileMapper, UserFile> i
                 }
             }
         }
-
-//        if (!parentIdsToEvict.isEmpty()) {
-//            TransactionSynchronizationManager.registerSynchronization(
-//                    new TransactionSynchronization() {
-//                        @Override
-//                        public void afterCommit() {
-//                            for (Long parentId : parentIdsToEvict) {
-//                                cache.evictDirectoryCache(parentId);
-//                            }
-//                        }
-//                    }
-//            );
-//        }
     }
 
     @Transactional(rollbackFor = Exception.class)
@@ -191,9 +169,6 @@ public class UserFileServiceImpl extends ServiceImpl<UserFileMapper, UserFile> i
         userFile.setPhysicalId(physicalId);
         self.saveFile(userFile);
         registerFileSavedEvent(Collections.singletonList(userFile.getId()), userId, parentId);
-        log.info("createUserFIle 的 id 是 {}", userFile.getId());
-
-
         return userFile;
     }
 
@@ -207,12 +182,14 @@ public class UserFileServiceImpl extends ServiceImpl<UserFileMapper, UserFile> i
         return userFileMapper.getFileChilren(folderIds, userId);
     }
 
+
+
     private void registerFileSavedEvent(List<Long> ids, Long userId, Long parentId) {
         TransactionHookManager.registerHook(new TransactionHook() {
             @Override
             public void afterCommit() {
                 sendFileSavedEvent(ids, userId);
-                cache.evictDirectoryCache(parentId);
+                cache.evictDirectoryCache(parentId, userId);
             }
 
             @Override
@@ -247,7 +224,7 @@ public class UserFileServiceImpl extends ServiceImpl<UserFileMapper, UserFile> i
                 .userId(userId)
                 .type(FileItemType.FILE)
                 .build();
-        rabbitTemplate.convertAndSend(EXCHANGE_NAME, "file.saved", event);
+        rabbitTemplate.convertAndSend(EXCHANGE_NAME, SAVED_EVENT, event);
     }
 
 

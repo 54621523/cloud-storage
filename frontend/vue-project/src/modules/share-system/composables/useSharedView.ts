@@ -7,6 +7,7 @@ import { FileItemType } from '@/modules/file-system/types/file';
 import { keepPreviousData } from '@tanstack/vue-query';
 import {
     useVerifySharedFile,
+    verifySharedFile,
     useGetShareInfo,
     useSaveSharedFile,
     downloadSharedFile,
@@ -17,8 +18,13 @@ import { useShareToken } from '@/utils/shareToken';
 import { getErrorMessage } from '@/utils/errorHandler';
 
 export function useSharedView() {
+    const rootId = ref<number>(0);          // 0 表示分享根（初始视图）
+    const currentParentId = ref<number>(0); // 当前浏览目录
+    const pathStack = ref<{ id: number; name: string }[]>([
+        { id: 0, name: '分享文件' }          // 虚拟根，用于返回初始视图
+    ]);
     const route = useRoute();
-    const { getToken, setToken, clearToken } = useShareToken();
+    const { getToken, setToken, clearToken, tokenCache } = useShareToken();
 
     // ---------- 当前分享码 ----------
     const currentShareCode = computed(() => route.params.shareCode as string || '');
@@ -26,8 +32,11 @@ export function useSharedView() {
     // ---------- 验证状态（直接从存储中读取） ----------
     const isVerified = computed(() => {
         if (!currentShareCode.value) return false;
-        return !!getToken(currentShareCode.value);
+        // 直接从响应式 cache 中取，无需调用 getToken（但 getToken 内部也会读 cache）
+        // 为了保持一致性，仍可调用 getToken，它会从 cache 读
+        return !!tokenCache.get(currentShareCode.value);
     });
+
 
     // ---------- 验证密码 ----------
     const verifyPwdMutation = useVerifySharedFile({
@@ -51,6 +60,8 @@ export function useSharedView() {
     });
 
     async function verifyPassword(pwd: string) {
+        const password = pwd
+        console.log(`传入的pwd是 ${pwd}`)
         await verifyPwdMutation.mutateAsync({
             shareCode: currentShareCode.value,
             params: { password: pwd },
@@ -102,11 +113,7 @@ export function useSharedView() {
     }
 
     // ---------- 面包屑导航 ----------
-    const rootId = ref<number>(0);          // 0 表示分享根（初始视图）
-    const currentParentId = ref<number>(0); // 当前浏览目录
-    const pathStack = ref<{ id: number; name: string }[]>([
-        { id: 0, name: '分享文件' }          // 虚拟根，用于返回初始视图
-    ]);
+
 
     /** 进入文件夹 */
     function navigateTo(file: FileItemUI) {
@@ -196,7 +203,7 @@ export function useSharedView() {
             return;
         }
         const items = Array.isArray(files) ? files : [files];
-        const identities = items.map(f => ({ id: f.id, type: f.type }));
+        const identities = items.map(f => ({ id: f.id!, type: f.type! }));
         const request = {
             targetFolderId: targetId,
             items: identities,

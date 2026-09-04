@@ -7,6 +7,7 @@ from RAG.lifespan_manager import manager
 from routers import documents
 from routers import ai
 from routers import rag_endpoint
+from routers import test_rag_endpoint
 
 
 app = FastAPI(lifespan = manager)
@@ -24,6 +25,7 @@ app.add_middleware(
 app.include_router(documents.router)
 app.include_router(ai.router)
 app.include_router(rag_endpoint.router)
+app.include_router(test_rag_endpoint.router)
 
 
 # --- 测试端点 ---

@@ -6,5 +6,5 @@
  */
 
 export type VerifySharedFileParams = {
-password?: string;
+    password?: string;
 };

@@ -20,18 +20,24 @@ import java.io.IOException;
 import java.util.Collection;
 import java.util.List;
 
+import static demo.cloud.file.mq.RabbitExchangeConfig.EXCHANGE_NAME;
+
 @Slf4j
 @Component
 @RequiredArgsConstructor
 public class FileIndexConsumer {
+
+    public static final String SAVED_EVENT = "file.saved";
+    public static final String DELETE_EVENT = "file.delete";
+    public static final String RENAME_EVENT = "file.rename";
 
     private final FileManagerService fileSearchService;
 
     @RabbitListener(
             bindings = @QueueBinding(
                     value = @Queue(name = "queue.file.saved", durable = "true"),
-                    exchange = @Exchange(name = "file.exchange", type = ExchangeTypes.TOPIC),
-                    key = "file.saved"
+                    exchange = @Exchange(name = EXCHANGE_NAME, type = ExchangeTypes.TOPIC),
+                    key = SAVED_EVENT
             ),
             ackMode = "MANUAL"
     )
@@ -54,8 +60,8 @@ public class FileIndexConsumer {
     @RabbitListener(
             bindings = @QueueBinding(
                     value = @Queue(name = "queue.file.delete", durable = "true"),
-                    exchange = @Exchange(name = "file.exchange", type = ExchangeTypes.TOPIC),
-                    key = "file.delete"
+                    exchange = @Exchange(name = EXCHANGE_NAME, type = ExchangeTypes.TOPIC),
+                    key = DELETE_EVENT
             ),
             ackMode = "MANUAL"
     )
@@ -79,8 +85,8 @@ public class FileIndexConsumer {
     @RabbitListener(
             bindings = @QueueBinding(
                     value = @Queue(name = "queue.file.rename", durable = "true"),
-                    exchange = @Exchange(name = "file.exchange", type = ExchangeTypes.TOPIC),
-                    key = "file.rename"
+                    exchange = @Exchange(name = EXCHANGE_NAME, type = ExchangeTypes.TOPIC),
+                    key = RENAME_EVENT
             ),
             ackMode = "MANUAL"
     )

@@ -1,0 +1,37 @@
+server:
+  port: 11203
+
+
+spring:
+  application:
+    name: ai-service
+
+
+  ai:
+    dashscope:
+      api-key: sk-4babd1daa2854ab9855bf7cd3ac88480
+      chat:
+        options:
+          model: deepseek-v4-flash-0731
+      embedding:
+        options:
+          model: text-embedding-v3
+
+  cloud:
+    nacos:
+      discovery:
+        enabled: true
+        server-addr: localhost:8848
+        namespace: public
+        group: DEFAULT_GROUP
+      config:
+        import-check:
+          enabled: false
+
+
+  rabbitmq:
+    host: localhost
+    port: 5672
+    username: admin
+    password: admin
+    virtual-host: /

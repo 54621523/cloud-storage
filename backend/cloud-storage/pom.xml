@@ -9,7 +9,7 @@
         <relativePath/>
     </parent>
     <groupId>demo.cloud</groupId>
-    <artifactId>storge</artifactId>
+    <artifactId>storage</artifactId>
     <version>0.0.1-SNAPSHOT</version>
     <packaging>pom</packaging>
 
@@ -25,11 +25,15 @@
         <module>share</module>
         <module>share-api</module>
         <module>outer-api</module>
+        <module>ai</module>
+        <module>ai-api</module>
+        <module>common/common-redis</module>
+        <module>common/common-rabbitmq</module>
     </modules>
 
     <properties>
         <java.version>17</java.version>
-        <spring-ai.version>1.1.4</spring-ai.version>
+        <spring-ai.version>1.1.2</spring-ai.version>
         <spring-cloud-alibaba.version>2025.0.0.0</spring-cloud-alibaba.version>
         <dubbo.version>3.3.4</dubbo.version>
         <mybatis-plus.version>3.5.15</mybatis-plus.version>
@@ -39,7 +43,6 @@
         <commons-lang3.version>3.14.0</commons-lang3.version>
         <json-schema-validator.version>2.0.0</json-schema-validator.version>
         <jjwt.version>0.12.5</jjwt.version>
-        <minio.version>8.5.7</minio.version>
         <jackson-datatype-jsr310.version>2.17.2</jackson-datatype-jsr310.version>
         <knife4j-openapi3-starter-version>4.4.0</knife4j-openapi3-starter-version>
     </properties>
@@ -47,9 +50,23 @@
     <dependencyManagement>
         <dependencies>
             <dependency>
+                <groupId>com.alibaba.cloud.ai</groupId>
+                <artifactId>spring-ai-alibaba-bom</artifactId>
+                <version>1.1.2.0</version>
+                <type>pom</type>
+                <scope>import</scope>
+            </dependency>
+            <dependency>
                 <groupId>org.springframework.ai</groupId>
                 <artifactId>spring-ai-bom</artifactId>
-                <version>${spring-ai.version}</version>
+                <version>1.1.2</version>
+                <type>pom</type>
+                <scope>import</scope>
+            </dependency>
+            <dependency>
+                <groupId>com.alibaba.cloud.ai</groupId>
+                <artifactId>spring-ai-alibaba-extensions-bom</artifactId>
+                <version>1.1.2.1</version>
                 <type>pom</type>
                 <scope>import</scope>
             </dependency>
@@ -127,12 +144,6 @@
                 <artifactId>jjwt-jackson</artifactId>
                 <version>${jjwt.version}</version>
                 <scope>runtime</scope>
-            </dependency>
-            <!-- MinIO -->
-            <dependency>
-                <groupId>io.minio</groupId>
-                <artifactId>minio</artifactId>
-                <version>${minio.version}</version>
             </dependency>
             <!-- Jackson Datatype JSR310 -->
             <dependency>

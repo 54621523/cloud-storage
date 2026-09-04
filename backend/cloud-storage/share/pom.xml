@@ -5,7 +5,7 @@
     <modelVersion>4.0.0</modelVersion>
     <parent>
         <groupId>demo.cloud</groupId>
-        <artifactId>storge</artifactId>
+        <artifactId>storage</artifactId>
         <version>0.0.1-SNAPSHOT</version>
     </parent>
 
@@ -101,11 +101,23 @@
         </dependency>
 
         <dependency>
-            <groupId>io.minio</groupId>
-            <artifactId>minio</artifactId>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter-cache</artifactId>
         </dependency>
 
 
+        <dependency>
+            <groupId>demo.cloud</groupId>
+            <artifactId>common-redis</artifactId>
+            <version>0.0.1-SNAPSHOT</version>
+            <scope>compile</scope>
+        </dependency>
+        <dependency>
+            <groupId>demo.cloud</groupId>
+            <artifactId>common-rabbitmq</artifactId>
+            <version>0.0.1-SNAPSHOT</version>
+            <scope>compile</scope>
+        </dependency>
         <dependency>
             <groupId>demo.cloud</groupId>
             <artifactId>common-web</artifactId>

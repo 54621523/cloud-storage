@@ -1,8 +1,8 @@
 package demo.cloud.common.pojo;
 
 import io.swagger.v3.oas.annotations.media.Schema;
-import jakarta.annotation.Nullable;
 import lombok.Data;
+import org.jetbrains.annotations.Nullable;
 
 import java.io.Serializable;
 

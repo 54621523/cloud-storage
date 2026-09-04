@@ -1,0 +1,33 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<configuration>
+
+    <!-- 控制台输出（保留） -->
+    <appender name="CONSOLE" class="ch.qos.logback.core.ConsoleAppender">
+        <encoder>
+            <pattern>%d{yyyy-MM-dd HH:mm:ss.SSS} [%thread] %-5level %logger{36} - %msg%n</pattern>
+        </encoder>
+    </appender>
+
+    <!-- 专门用于 RAG 追踪的 File Appender -->
+    <appender name="RAG_FILE" class="ch.qos.logback.core.rolling.RollingFileAppender">
+        <file>./logs/rag_traces.jsonl</file>
+        <rollingPolicy class="ch.qos.logback.core.rolling.TimeBasedRollingPolicy">
+            <fileNamePattern>./logs/rag_traces.%d{yyyy-MM-dd}.jsonl</fileNamePattern>
+            <maxHistory>30</maxHistory>
+        </rollingPolicy>
+        <encoder>
+            <pattern>%msg%n</pattern>   <!-- 只输出消息内容，不含时间戳等 -->
+        </encoder>
+    </appender>
+
+    <!-- 定义 RAG_TRACE logger，只输出到文件 -->
+    <logger name="RAG_TRACE" level="INFO" additivity="false">
+        <appender-ref ref="RAG_FILE" />
+    </logger>
+
+    <!-- 根 logger 依旧输出到控制台 -->
+    <root level="INFO">
+        <appender-ref ref="CONSOLE" />
+    </root>
+
+</configuration>

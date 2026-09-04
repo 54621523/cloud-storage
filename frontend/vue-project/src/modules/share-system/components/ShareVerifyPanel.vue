@@ -36,8 +36,7 @@ const performVerification = async (password: string, silent: boolean = false) =>
 
     try {
         const shareCode = route.params.shareCode as string;
-        await shareContext.verifyPassword(shareCode, password.trim());
-        await shareContext.fetchDetail(0, 0);
+        await shareContext.verifyPassword(password.trim())
     } catch (err: any) {
         // 仅在非静默模式下显示错误
         if (!silent) {

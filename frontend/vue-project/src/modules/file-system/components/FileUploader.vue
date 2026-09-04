@@ -197,7 +197,6 @@ function calculateFileMD5(file: File): Promise<string> {
 
 // 初始化上传会话
 onMounted(() => {
-  let isRefreshed = false
   // 创建上传器
   uploader = FileUD.createUploader(UPLOADER_NAME, {
     maxFileConcurrent: 10,

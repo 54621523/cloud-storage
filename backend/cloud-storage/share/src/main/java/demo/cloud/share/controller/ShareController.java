@@ -1,7 +1,6 @@
 package demo.cloud.share.controller;
 
 
-import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import demo.cloud.common.pojo.PageResult;
 import demo.cloud.common.pojo.Result;
 import demo.cloud.common.web.context.BaseContext;
@@ -10,7 +9,6 @@ import demo.cloud.share.dto.CreateShareRequest;
 import demo.cloud.share.dto.CreateShareResponse;
 import demo.cloud.share.dto.ShareLinkVO;
 import demo.cloud.share.dto.TransferRequest;
-import demo.cloud.share.pojo.ShareLink;
 import demo.cloud.share.service.ShareService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.Parameter;
@@ -73,10 +71,7 @@ public class ShareController {
     @DeleteMapping("/cancel")
     public Result cancelSharedFile(@RequestParam @Min(0) Long shareId){
         Long userId = BaseContext.getUserId();
-        shareService.remove(new LambdaQueryWrapper<ShareLink>()
-                .eq(ShareLink::getId,shareId)
-                .eq(ShareLink::getUserId,userId));
-        //TODO 缓存失效
+        shareService.deleteShareLink(shareId, userId);
 
         return Result.success();
     }

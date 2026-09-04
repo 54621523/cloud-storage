@@ -4,6 +4,7 @@ package demo.cloud.file.service.impl;
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.github.yulichang.toolkit.JoinWrappers;
 import com.github.yulichang.wrapper.MPJLambdaWrapper;
+import demo.cloud.auth.dubboService.UserQuotaDubboService;
 import demo.cloud.file.dto.FilePhysicalDTO;
 import demo.cloud.file.dto.ItemGroup;
 import demo.cloud.file.dto.ItemIdentity;
@@ -15,8 +16,8 @@ import demo.cloud.file.service.*;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.apache.dubbo.config.annotation.DubboService;
+import org.apache.seata.spring.annotation.GlobalTransactional;
 import org.springframework.beans.BeanUtils;
-import org.springframework.transaction.annotation.Transactional;
 import software.amazon.awssdk.services.s3.model.GetObjectRequest;
 import software.amazon.awssdk.services.s3.presigner.S3Presigner;
 import software.amazon.awssdk.services.s3.presigner.model.GetObjectPresignRequest;
@@ -29,8 +30,6 @@ import java.time.Duration;
 import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
 import java.util.*;
-import java.util.concurrent.atomic.AtomicInteger;
-import java.util.function.BiConsumer;
 import java.util.function.Function;
 import java.util.stream.Collectors;
 
@@ -45,6 +44,7 @@ public class FileDubboServiceImpl implements FileDubboService {
     private final UserFileService userFileService;
     private final UserFolderService userFolderService;
     private final FilePhysicalService filePhysicalService;
+    private final UserQuotaDubboService quotaDubboService;
 
     private final S3Presigner s3Presigner;
 
@@ -148,252 +148,177 @@ public class FileDubboServiceImpl implements FileDubboService {
 
 
     @Override
-    @Transactional(rollbackFor = Exception.class)
+    @GlobalTransactional(rollbackFor = Exception.class)
     public void copyBatch(List<ItemIdentity> validItems, Long userId, Long targetFolderId) {
-        // TODO 缓存失效
-        long methodStart = System.currentTimeMillis();
-        log.info("========== copyBatch 开始 ========== validItems数量: {}, userId: {}, targetFolderId: {}",
-                validItems == null ? 0 : validItems.size(), userId, targetFolderId);
+        // ============ 1. 前置校验 ============
+        if (validItems == null || validItems.isEmpty()) return;
+        if (targetFolderId == null) throw new IllegalArgumentException("目标文件夹不能为空");
 
-        if (validItems == null || validItems.isEmpty()) {
-            log.warn("转存文件不能为空");
-            return;
-        }
-        if (targetFolderId == null) {
-            throw new IllegalArgumentException("目标文件夹不能为空");
-        }
-        boolean exists = userFolderService.exists(
+        // 检查目标文件夹归属
+        boolean targetExists = userFolderService.exists(
                 new LambdaQueryWrapper<UserFolder>()
                         .eq(UserFolder::getId, targetFolderId)
                         .eq(UserFolder::getUserId, userId)
         );
-        if(!exists){
-            throw new IllegalArgumentException("目标文件夹不属于该用户");
-        }
+        if (!targetExists) throw new IllegalArgumentException("目标文件夹不属于该用户");
 
-
-        // ==================== 1. 查询所有需要复制的源数据 ====================
-        long step1Start = System.currentTimeMillis();
+        // ============ 2. 获取所有源数据（文件夹树 + 文件） ============
         ItemGroup group = ItemGroup.from(validItems);
 
-        // 批量查询所有源文件夹（含子孙）
-        List<UserFolder> allFoldersToCopy = new ArrayList<>();
+        // 2.1 查询所有源文件夹（包括子孙）
+        List<UserFolder> allFolders = new ArrayList<>();
         if (!group.folderIds().isEmpty()) {
-            allFoldersToCopy = userFolderService.selectSubTreeBatch(group.folderIds());
+            allFolders = userFolderService.selectSubTreeBatch(group.folderIds());
         }
-        log.info("步骤1-1: 查询源文件夹树完成，文件夹数量: {}, 耗时: {}ms",
-                allFoldersToCopy.size(), System.currentTimeMillis() - step1Start);
-
-        // 收集所有文件夹ID（用于查询文件）
-        Set<Long> allFolderIds = allFoldersToCopy.stream()
-                .map(UserFolder::getId)
-                .collect(Collectors.toSet());
+        Set<Long> allFolderIds = allFolders.stream().map(UserFolder::getId).collect(Collectors.toSet());
         allFolderIds.addAll(group.folderIds());
 
-        // 查询所有关联文件
-        long fileQueryStart = System.currentTimeMillis();
-        List<UserFile> allFilesToCopy = new ArrayList<>();
+        // 2.2 查询所有关联文件
+        List<UserFile> allFiles = new ArrayList<>();
         if (!allFolderIds.isEmpty()) {
-            allFilesToCopy.addAll(userFileService.list(
+            allFiles.addAll(userFileService.list(
                     new LambdaQueryWrapper<UserFile>().in(UserFile::getParentId, allFolderIds)
             ));
         }
         if (!group.fileIds().isEmpty()) {
-            allFilesToCopy.addAll(userFileService.list(
+            allFiles.addAll(userFileService.list(
                     new LambdaQueryWrapper<UserFile>().in(UserFile::getId, group.fileIds())
             ));
         }
-        allFilesToCopy = allFilesToCopy.stream().distinct().collect(Collectors.toList());
-        log.info("步骤1-2: 查询文件完成，文件数量: {}, 耗时: {}ms",
-                allFilesToCopy.size(), System.currentTimeMillis() - fileQueryStart);
-        log.info("步骤1总计耗时: {}ms", System.currentTimeMillis() - step1Start);
+        allFiles = allFiles.stream().distinct().collect(Collectors.toList());
 
-        // ==================== 2. 数据预处理 ====================
-        long step2Start = System.currentTimeMillis();
-        Map<Long, List<UserFolder>> parentToChildrenMap = allFoldersToCopy.stream()
+        // 构建源文件夹映射（快速取用）
+        Map<Long, UserFolder> folderMap = allFolders.stream()
+                .collect(Collectors.toMap(UserFolder::getId, Function.identity()));
+
+        // 构建父子关系
+        Map<Long, List<UserFolder>> parentToChildren = allFolders.stream()
                 .filter(f -> !group.folderIds().contains(f.getId()))
                 .collect(Collectors.groupingBy(UserFolder::getParentId));
 
-        Map<Long, UserFolder> sourceFolderMap = allFoldersToCopy.stream()
-                .collect(Collectors.toMap(UserFolder::getId, Function.identity()));
-
-        Map<Long, Long> oldToNewFolderMap = new HashMap<>();
-        log.info("步骤2 数据预处理耗时: {}ms", System.currentTimeMillis() - step2Start);
-
-        // ==================== 3. 目标目录缓存 ====================
-        Map<Long, Map<String, Long>> targetCache = new HashMap<>();
-
-        // 辅助方法：批量加载目标父目录下的已有子文件夹
-        AtomicInteger loadCount = new AtomicInteger(0); // 统计loadTargetChildren调用次数
-        BiConsumer<Set<Long>, Long> loadTargetChildren = (parentIds, uid) -> {
-            long loadStart = System.currentTimeMillis();
-            loadCount.incrementAndGet();
-            Set<Long> missing = parentIds.stream()
-                    .filter(pid -> !targetCache.containsKey(pid))
-                    .collect(Collectors.toSet());
-            if (missing.isEmpty()) {
-                log.debug("loadTargetChildren 命中缓存，跳过查询");
-                return;
-            }
-
-            List<UserFolder> existing = userFolderService.list(
-                    new LambdaQueryWrapper<UserFolder>()
-                            .in(UserFolder::getParentId, missing)
-                            .eq(UserFolder::getUserId, uid)
-                            .isNull(UserFolder::getDeletedAt)
-            );
-            for (UserFolder f : existing) {
-                targetCache.computeIfAbsent(f.getParentId(), k -> new HashMap<>())
-                        .put(f.getName(), f.getId());
-            }
-            for (Long pid : missing) {
-                targetCache.putIfAbsent(pid, new HashMap<>());
-            }
-            log.debug("loadTargetChildren 查询完成，parentIds: {}, 查询到已有文件夹: {}, 耗时: {}ms",
-                    missing, existing.size(), System.currentTimeMillis() - loadStart);
-        };
-
-        // ==================== 4. 处理根文件夹 ====================
-        long step4Start = System.currentTimeMillis();
-        // 预先加载目标根目录下的已有文件夹
-        loadTargetChildren.accept(Collections.singleton(targetFolderId), userId);
-        Map<String, Long> rootChildMap = targetCache.get(targetFolderId);
-
-        for (Long rootOldId : group.folderIds()) {
-            UserFolder sourceRoot = sourceFolderMap.get(rootOldId);
-            if (sourceRoot == null) continue;
-
-            Long existingId = rootChildMap.get(sourceRoot.getName());
-            if (existingId != null) {
-                oldToNewFolderMap.put(rootOldId, existingId);
-            } else {
-                UserFolder newRoot = new UserFolder();
-                BeanUtils.copyProperties(sourceRoot, newRoot, "id", "createTime", "updateTime", "deleted");
-                newRoot.setUserId(userId);
-                newRoot.setParentId(targetFolderId);
-                newRoot.setName(sourceRoot.getName());
-                userFolderService.save(newRoot);
-
-                oldToNewFolderMap.put(rootOldId, newRoot.getId());
-                rootChildMap.put(sourceRoot.getName(), newRoot.getId());
-            }
-        }
-        log.info("步骤4 处理根文件夹完成，根文件夹数量: {}, 耗时: {}ms",
-                group.folderIds().size(), System.currentTimeMillis() - step4Start);
-
-        // ==================== 5. 复制子孙文件夹（BFS） ====================
-        long step5Start = System.currentTimeMillis();
-        int totalSubFolders = 0;
+        // ============ 3. BFS 复制文件夹 ============
+        Map<Long, Long> oldToNew = new HashMap<>();
         Deque<Long> queue = new ArrayDeque<>(group.folderIds());
 
+        // 逐层处理，维护目标父目录下的已有文件夹缓存（批量查询）
         while (!queue.isEmpty()) {
-            int levelSize = queue.size();
-            List<Long> currentLevelNodes = new ArrayList<>(levelSize);
-            for (int i = 0; i < levelSize; i++) {
-                currentLevelNodes.add(queue.poll());
+            // 取出当前层的所有节点
+            Set<Long> currentLevel = new HashSet<>();
+            int size = queue.size();
+            for (int i = 0; i < size; i++) {
+                currentLevel.add(queue.poll());
             }
 
-            Set<Long> targetParentIds = currentLevelNodes.stream()
-                    .map(oldToNewFolderMap::get)
-                    .filter(Objects::nonNull)
-                    .collect(Collectors.toSet());
-
-            if (!targetParentIds.isEmpty()) {
-                loadTargetChildren.accept(targetParentIds, userId);
+            // 为当前层的每个节点确定目标父目录ID
+            Map<Long, Long> currentOldToNewParent = new HashMap<>();
+            for (Long oldId : currentLevel) {
+                Long newParentId = oldToNew.getOrDefault(oldId, targetFolderId);
+                // 如果 oldId 是根节点（在 group.folderIds() 中），则 newParentId 是 targetFolderId
+                // 如果 oldId 是子孙节点，则 newParentId 已在 oldToNew 中
+                currentOldToNewParent.put(oldId, newParentId);
             }
 
-            for (Long currentOldId : currentLevelNodes) {
-                Long newParentId = oldToNewFolderMap.get(currentOldId);
-                if (newParentId == null) continue;
-
-                List<UserFolder> children = parentToChildrenMap.getOrDefault(currentOldId, Collections.emptyList());
-                if (children.isEmpty()) continue;
-
-                Map<String, Long> childMap = targetCache.get(newParentId);
-                for (UserFolder childSource : children) {
-                    Long existingChildId = childMap.get(childSource.getName());
-                    if (existingChildId != null) {
-                        oldToNewFolderMap.put(childSource.getId(), existingChildId);
-                    } else {
-                        UserFolder newChild = new UserFolder();
-                        BeanUtils.copyProperties(childSource, newChild, "id", "createTime", "updateTime", "deleted");
-                        newChild.setUserId(userId);
-                        newChild.setParentId(newParentId);
-                        newChild.setName(childSource.getName());
-                        userFolderService.save(newChild);
-
-                        oldToNewFolderMap.put(childSource.getId(), newChild.getId());
-                        childMap.put(childSource.getName(), newChild.getId());
-                    }
-                    queue.offer(childSource.getId());
-                    totalSubFolders++;
-                }
-            }
-        }
-        log.info("步骤5 复制子孙文件夹完成，共处理子文件夹: {}, loadTargetChildren调用次数: {}, 耗时: {}ms",
-                totalSubFolders, loadCount.get(), System.currentTimeMillis() - step5Start);
-
-        // ==================== 6. 复制文件 ====================
-        long step6Start = System.currentTimeMillis();
-        List<UserFile> newFileList = new ArrayList<>();
-
-        if (!allFilesToCopy.isEmpty()) {
-            // 1. 收集所有目标父目录ID
-            Set<Long> targetParentIds = allFilesToCopy.stream()
-                    .map(f -> oldToNewFolderMap.getOrDefault(f.getParentId(), targetFolderId))
-                    .collect(Collectors.toSet());
-
-            // 2. 查询目标目录下已存在的文件（当前用户，未删除）
-            List<UserFile> existingFiles = userFileService.list(
-                    new LambdaQueryWrapper<UserFile>()
-                            .in(UserFile::getParentId, targetParentIds)
-                            .eq(UserFile::getUserId, userId)
-                            .isNull(UserFile::getDeletedAt)
+            // 批量查询这些目标父目录下已有的子文件夹（去重）
+            Set<Long> targetParentIds = new HashSet<>(currentOldToNewParent.values());
+            List<UserFolder> existingChildren = userFolderService.list(
+                    new LambdaQueryWrapper<UserFolder>()
+                            .in(UserFolder::getParentId, targetParentIds)
+                            .eq(UserFolder::getUserId, userId)
+                            .isNull(UserFolder::getDeletedAt)
             );
-
-            // 3. 构建存在映射 (parentId + name) -> fileId
-            Map<String, Long> existMap = existingFiles.stream()
+            // 构建 (parentId, name) -> folderId 的映射
+            Map<String, Long> existingMap = existingChildren.stream()
                     .collect(Collectors.toMap(
                             f -> f.getParentId() + "-" + f.getName(),
-                            UserFile::getId,
+                            UserFolder::getId,
                             (a, b) -> a
                     ));
 
-            // 4. 仅插入不存在的文件（已存在的跳过）
-            for (UserFile sourceFile : allFilesToCopy) {
-                Long newParentId = oldToNewFolderMap.getOrDefault(sourceFile.getParentId(), targetFolderId);
-                String key = newParentId + "-" + sourceFile.getName();
-                if (existMap.containsKey(key)) {
-                    // 重命名后加入列表
-                    UserFile newFile = new UserFile();
-                    BeanUtils.copyProperties(sourceFile, newFile, "id", "createTime", "updateTime", "deleted");
-                    newFile.setUserId(userId);
-                    newFile.setParentId(newParentId);
-                    newFile.setName(generateNameWithTimestamp(sourceFile.getName()));
-                    newFileList.add(newFile);
-                    continue;
+            // 处理当前层的每个文件夹
+            for (Long oldId : currentLevel) {
+                UserFolder source = folderMap.get(oldId);
+                if (source == null) continue;
+
+                Long newParentId = currentOldToNewParent.get(oldId);
+                String key = newParentId + "-" + source.getName();
+                Long existingId = existingMap.get(key);
+                if (existingId != null) {
+                    oldToNew.put(oldId, existingId);
+                } else {
+                    // 新建文件夹
+                    UserFolder newFolder = new UserFolder();
+                    BeanUtils.copyProperties(source, newFolder, "id", "createTime", "updateTime", "deletedAt");
+                    newFolder.setUserId(userId);
+                    newFolder.setParentId(newParentId);
+                    userFolderService.save(newFolder);
+                    oldToNew.put(oldId, newFolder.getId());
+                    // 将新文件夹加入 existingMap，供同层其他节点可能复用（但同层不会重复）
+                    existingMap.put(key, newFolder.getId());
                 }
-                UserFile newFile = new UserFile();
-                BeanUtils.copyProperties(sourceFile, newFile, "id", "createTime", "updateTime", "deleted");
-                newFile.setUserId(userId);
-                newFile.setParentId(newParentId);
-                newFile.setName(sourceFile.getName());
-                newFileList.add(newFile);
+                // 将当前文件夹的子节点入队（下一层）
+                List<UserFolder> children = parentToChildren.getOrDefault(oldId, Collections.emptyList());
+                for (UserFolder child : children) {
+                    queue.offer(child.getId());
+                }
             }
         }
 
-        if (!newFileList.isEmpty()) {
-            long insertStart = System.currentTimeMillis();
-            // 直接批量插入（因为已经过滤掉冲突文件，不会触发 DuplicateKeyException）
-            userFileService.saveBatch(newFileList, 1000);  // 改用普通批量插入，无需重试
-            log.info("步骤6-1 批量插入文件耗时: {}ms, 实际插入文件数: {}",
-                    System.currentTimeMillis() - insertStart, newFileList.size());
-        } else {
-            log.info("步骤6: 所有文件均已存在，无需插入");
-        }
-        log.info("步骤6 复制文件总耗时: {}ms", System.currentTimeMillis() - step6Start);
+        // ============ 4. 复制文件 ============
+        if (allFiles.isEmpty()) return;
+        // ---------- 4.0 计算待复制文件总大小 ----------
+        long totalFileSize = allFiles.stream()
+                .mapToLong(UserFile::getSize)   // 假设 UserFile 中有 size 字段（long）
+                .sum();
 
-        log.info("========== copyBatch 总耗时: {}ms ==========", System.currentTimeMillis() - methodStart);
+        if (totalFileSize > 0) {
+            // 远程调用配额服务（Dubbo + Seata 全局事务）
+            boolean deducted = quotaDubboService.subtractUsedQuota(userId, totalFileSize);
+            if (!deducted) {
+                throw new IllegalStateException("用户可用配额不足，无法完成复制操作");
+            }
+        }
+
+
+        // 收集所有目标父目录ID（用于查询冲突）
+        Set<Long> targetParentIds = allFiles.stream()
+                .map(f -> oldToNew.getOrDefault(f.getParentId(), targetFolderId))
+                .collect(Collectors.toSet());
+
+        // 查询目标目录下已存在的文件（当前用户，未删除）
+        List<UserFile> existingFiles = userFileService.list(
+                new LambdaQueryWrapper<UserFile>()
+                        .in(UserFile::getParentId, targetParentIds)
+                        .eq(UserFile::getUserId, userId)
+                        .isNull(UserFile::getDeletedAt)
+        );
+        Map<String, Long> existFileMap = existingFiles.stream()
+                .collect(Collectors.toMap(
+                        f -> f.getParentId() + "-" + f.getName(),
+                        UserFile::getId,
+                        (a, b) -> a
+                ));
+
+        // 生成待插入文件列表
+        List<UserFile> newFiles = new ArrayList<>();
+        for (UserFile source : allFiles) {
+            Long newParentId = oldToNew.getOrDefault(source.getParentId(), targetFolderId);
+            String key = newParentId + "-" + source.getName();
+            UserFile newFile = new UserFile();
+            BeanUtils.copyProperties(source, newFile, "id", "createTime", "updateTime", "deleted");
+            newFile.setUserId(userId);
+            newFile.setParentId(newParentId);
+            if (existFileMap.containsKey(key)) {
+                newFile.setName(generateNameWithTimestamp(source.getName()));
+            } else {
+                newFile.setName(source.getName());
+            }
+            newFiles.add(newFile);
+        }
+
+        if (!newFiles.isEmpty()) {
+            userFileService.saveBatch(newFiles, 1000);
+        }
+        //TODO 缓存失效
     }
 
 

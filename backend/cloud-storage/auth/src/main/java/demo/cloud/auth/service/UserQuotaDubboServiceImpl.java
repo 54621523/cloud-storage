@@ -4,6 +4,7 @@ import demo.cloud.auth.dto.QuotaInfo;
 import demo.cloud.auth.dubboService.UserQuotaDubboService;
 import demo.cloud.auth.mapper.UserMapper;
 import demo.cloud.auth.pojo.User;
+import lombok.extern.slf4j.Slf4j;
 import org.apache.dubbo.config.annotation.DubboService;
 import org.redisson.api.RLock;
 import org.redisson.api.RedissonClient;
@@ -14,6 +15,7 @@ import java.util.concurrent.TimeUnit;
 
 @DubboService(version = "1.0.0")
 @Service
+@Slf4j
 public class UserQuotaDubboServiceImpl implements UserQuotaDubboService {
 
     @Autowired
@@ -45,6 +47,7 @@ public class UserQuotaDubboServiceImpl implements UserQuotaDubboService {
      */
     @Override
     public boolean addUsedQuota(Long userId, Long fileSize) {
+        log.info("要扣除的配额为 {}", fileSize);
         String lockKey = "quota_lock:" + userId;
         RLock lock = redissonClient.getLock(lockKey);
         try {
@@ -79,6 +82,7 @@ public class UserQuotaDubboServiceImpl implements UserQuotaDubboService {
         try {
             lock.lock(3, TimeUnit.SECONDS);
             // 先查询当前用户信息（含version）
+            log.info("要回退的配额为 {}", fileSize);
             User user = userMapper.selectById(userId);
             if (user == null) {
                 return false;
@@ -103,6 +107,7 @@ public class UserQuotaDubboServiceImpl implements UserQuotaDubboService {
      */
     @Override
     public QuotaInfo getQuotaInfo(Long userId) {
+
         User user = userMapper.selectById(userId);
         if (user == null) {
             return null;

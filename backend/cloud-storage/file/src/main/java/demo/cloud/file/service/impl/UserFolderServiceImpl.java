@@ -15,8 +15,6 @@ import demo.cloud.file.service.UserFolderService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.apache.ibatis.annotations.Param;
-import org.apache.seata.tm.api.transaction.TransactionHook;
-import org.apache.seata.tm.api.transaction.TransactionHookManager;
 import org.redisson.api.RLock;
 import org.redisson.api.RedissonClient;
 import org.springframework.amqp.rabbit.core.RabbitTemplate;
@@ -35,6 +33,9 @@ import java.time.format.DateTimeFormatter;
 import java.util.*;
 import java.util.stream.Collectors;
 
+import static demo.cloud.file.listener.FileIndexConsumer.SAVED_EVENT;
+import static demo.cloud.file.mq.RabbitExchangeConfig.EXCHANGE_NAME;
+
 
 @Slf4j
 @RequiredArgsConstructor
@@ -45,7 +46,6 @@ public class UserFolderServiceImpl extends ServiceImpl<UserFolderMapper, UserFol
     private final RedissonClient redissonClient;
     private final CacheInvalidationHelper cache;
     private final FolderTreePathMapper userFolderTreeMapper;
-    private static final String EXCHANGE_NAME = "file.exchange";
     private final RabbitTemplate rabbitTemplate;
     private final RedisTemplate<String, Object> redisTemplate;
 
@@ -182,46 +182,13 @@ public class UserFolderServiceImpl extends ServiceImpl<UserFolderMapper, UserFol
         return originalName + "_" + timestamp + "_" + random;
     }
 
-    private void registerFolderSavedEvent(List<Long> ids, Long userId) {
-        TransactionHookManager.registerHook(new TransactionHook() {
-            @Override
-            public void afterCommit() {
-                sendFolderSavedEvent(ids, userId);
-            }
-
-            @Override
-            public void beforeRollback() {
-            }
-
-            @Override
-            public void beforeBegin() {
-            }
-
-            @Override
-            public void afterBegin() {
-            }
-
-            @Override
-            public void beforeCommit() {
-            }
-
-            @Override
-            public void afterRollback() {
-            }
-
-            @Override
-            public void afterCompletion() {
-            }
-        });
-    }
-
     private void sendFolderSavedEvent(List<Long> ids, Long userId) {
         FileSavedEvent event = FileSavedEvent.builder()
                 .ids(ids)
                 .userId(userId)
                 .type(FileItemType.FOLDER)
                 .build();
-        rabbitTemplate.convertAndSend(EXCHANGE_NAME, "file.saved", event);
+        rabbitTemplate.convertAndSend(EXCHANGE_NAME, SAVED_EVENT, event);
     }
 
 
@@ -252,7 +219,6 @@ public class UserFolderServiceImpl extends ServiceImpl<UserFolderMapper, UserFol
             );
 
             if (existing != null) {
-                // 已存在，直接复用
                 currentParentId = existing.getId();
                 pathToId.put(pathStr, currentParentId);
             } else {
@@ -274,15 +240,14 @@ public class UserFolderServiceImpl extends ServiceImpl<UserFolderMapper, UserFol
 
             }
         }
-
-        // 事务提交后异步发送事件和清理缓存
+        // 事务提交后 发送事件和清理缓存
         if (!newFolderIds.isEmpty()) {
             TransactionSynchronizationManager.registerSynchronization(
                     new TransactionSynchronization() {
                         @Override
                         public void afterCommit() {
                             sendFolderSavedEvent(newFolderIds, userId);
-                            cache.evictDirectoryCache(rootParentId);
+                            cache.evictDirectoryCache(rootParentId, userId);
                         }
                     }
             );
