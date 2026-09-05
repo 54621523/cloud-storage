@@ -22,6 +22,7 @@ public class MeiliSearchConfigHelper {
         int maxTotalHits = indexAnno.maxTotalHits();
         int maxValuesPerFacet = indexAnno.maxValuesPerFacet();
 
+
         // 2. 读取字段上的 @MSFiled
         List<String> searchable = new ArrayList<>();
         List<String> filterable = new ArrayList<>();
@@ -50,8 +51,6 @@ public class MeiliSearchConfigHelper {
             }
         }
 
-        // 如果没标记任何 searchable，可以设置一个默认（比如所有 String 字段），但不是必须
-        // 这里保持原样，由用户显式标记
 
         return new MeiliIndexConfig(
                 uid,

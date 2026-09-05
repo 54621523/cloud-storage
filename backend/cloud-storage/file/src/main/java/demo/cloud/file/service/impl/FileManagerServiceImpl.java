@@ -248,7 +248,7 @@ public class FileManagerServiceImpl implements FileManagerService {
     public List<VirtualFileVO> getVirtualFileList(Long parentId, Long userId) {
         String cacheKey;
         if (userId != null) {
-            cacheKey = DIR_CACHE_PREFIX + ":" + userId + ":" + parentId;
+            cacheKey = DIR_CACHE_PREFIX + userId + ":" + parentId;
         } else {
             // 匿名访问
             cacheKey = null;
@@ -707,6 +707,7 @@ public class FileManagerServiceImpl implements FileManagerService {
                             .eq(UserFile::getId, group.fileIds().get(0))
             );
             cache.evictDirectoryCache(one.getParentId(), userId);
+            sendMoveToRecycleEvent(group.fileIds(), userId, FileItemType.FILE);
         }
         if (!group.folderIds().isEmpty()) {
             userFolderService.update(
@@ -721,6 +722,7 @@ public class FileManagerServiceImpl implements FileManagerService {
                             .eq(UserFolder::getId, group.folderIds().get(0))
             );
             cache.evictDirectoryCache(one.getParentId(), userId);
+            sendMoveToRecycleEvent(group.folderIds(), userId, FileItemType.FOLDER);
         }
     }
 
@@ -828,7 +830,16 @@ public class FileManagerServiceImpl implements FileManagerService {
         });
     }
 
-    private void sendDeleteEvent(Set<Long> fileId, Long userId, FileItemType type) {
+    private void sendDeleteEvent(Collection<Long> fileId, Long userId, FileItemType type) {
+        FileDeleteEvent event = FileDeleteEvent.builder()
+                .ids(fileId)
+                .userId(userId)
+                .type(type)
+                .build();
+        rabbitTemplate.convertAndSend(EXCHANGE_NAME, DELETE_EVENT, event);
+    }
+
+    private void sendMoveToRecycleEvent(Collection<Long> fileId, Long userId, FileItemType type) {
         FileDeleteEvent event = FileDeleteEvent.builder()
                 .ids(fileId)
                 .userId(userId)

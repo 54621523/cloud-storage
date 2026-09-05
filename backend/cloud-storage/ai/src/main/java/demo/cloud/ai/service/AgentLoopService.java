@@ -106,14 +106,14 @@ public class AgentLoopService {
                         false
                 ))
                 .addEdge(StateGraph.START, "intentCheck")
-                .addEdge("intentCheck", "preprocess")
                 .addConditionalEdges("intentCheck",
                         edge_async(state -> state.value("_short_", "NO")),
                         Map.of(
                                 "YES", StateGraph.END,
-                                "NO", simpleRAGAgent.name()
+                                "NO", "preprocess"
                         )
                 )
+                .addEdge("preprocess", simpleRAGAgent.name())
                 .addEdge(simpleRAGAgent.name(), StateGraph.END);
         var memory = new MemorySaver();
         var compileConfig = CompileConfig.builder()

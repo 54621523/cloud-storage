@@ -137,7 +137,7 @@ const handleDelete = async () => {
   if (selectedList.value.length === 0) return;
   try {
     await ElMessageBox.confirm(
-      `确定删除选中的 ${selectedList.value.length} 个项吗？此操作不可恢复！`,
+      `确定删除选中的 ${selectedList.value.length} 个项吗？`,
       '删除确认',
       {
         confirmButtonText: '确定删除',

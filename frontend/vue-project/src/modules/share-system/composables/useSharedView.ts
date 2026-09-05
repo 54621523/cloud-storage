@@ -60,8 +60,6 @@ export function useSharedView() {
     });
 
     async function verifyPassword(pwd: string) {
-        const password = pwd
-        console.log(`传入的pwd是 ${pwd}`)
         await verifyPwdMutation.mutateAsync({
             shareCode: currentShareCode.value,
             params: { password: pwd },
@@ -107,6 +105,8 @@ export function useSharedView() {
     const shareFileList = computed<FileItemUI[]>(() =>
         rawFileList.value.map(item => ({ ...item }))
     );
+
+    const selectedList = selection.selectedList
 
     function clearSelection() {
         selection.clear();
@@ -224,6 +224,7 @@ export function useSharedView() {
         toggleSelectAll: selection.toggleAll,
         clearSelection: selection.clear,
         updateSelect: selection.select,
+        selectedList,
         verifyPassword,
         isVerifying: verifyPwdMutation.isPending,
         isVerified,

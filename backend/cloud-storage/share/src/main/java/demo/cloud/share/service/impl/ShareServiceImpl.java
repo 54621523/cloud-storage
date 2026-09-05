@@ -194,30 +194,7 @@ public class ShareServiceImpl extends ServiceImpl<ShareLinkMapper, ShareLink> im
         return jwtUtil.generateShareToken(shareCode);
     }
 
-    /**
-     * @param id
-     * @param userId
-     */
-    @Override
-    public void deleteShareLink(Long id, Long userId) {
-        boolean exist = shareLinkMapper.exists(
-                new LambdaQueryWrapper<ShareLink>()
-                        .eq(ShareLink::getUserId, userId)
-                        .eq(ShareLink::getId, id)
-        );
-        if(!exist){
-            return;
-        }
-        shareLinkMapper.delete(
-                new LambdaQueryWrapper<ShareLink>()
-                        .eq(ShareLink::getUserId, userId)
-                        .eq(ShareLink::getId, id)
-        );
-        shareLinkItemMapper.delete(
-                new LambdaQueryWrapper<ShareLinkItem>()
-                        .eq(ShareLinkItem::getShareId, id)
-        );
-    }
+
 
     @Override
     public PageResult<ShareLinkVO> queryMyShare(Long pageNum, Long pageSize, Long userId) {
@@ -407,6 +384,33 @@ public class ShareServiceImpl extends ServiceImpl<ShareLinkMapper, ShareLink> im
     // ====== DELETE ======
     // ========================================
 
+    /**
+     * @param id
+     * @param userId
+     */
+    @Override
+    public void deleteShareLink(Long id, Long userId) {
+        ShareLink shareLink = shareLinkMapper.selectOne(
+                new LambdaQueryWrapper<ShareLink>()
+                        .eq(ShareLink::getUserId, userId)
+                        .eq(ShareLink::getId, id)
+        );
+        if(shareLink == null){
+            return;
+        }
+        shareLinkMapper.delete(
+                new LambdaQueryWrapper<ShareLink>()
+                        .eq(ShareLink::getUserId, userId)
+                        .eq(ShareLink::getId, id)
+        );
+        shareLinkItemMapper.delete(
+                new LambdaQueryWrapper<ShareLinkItem>()
+                        .eq(ShareLinkItem::getShareId, id)
+        );
+        String cachedKey = SHARE_CACHE_PREFIX + shareLink.getShareCode();
+        redisTemplate.delete(cachedKey);
+    }
+
     // ========================================
     // ====== PRIVATE METHODS ======
     // ========================================
@@ -476,11 +480,6 @@ public class ShareServiceImpl extends ServiceImpl<ShareLinkMapper, ShareLink> im
         }
 
         return cacheEntity;
-    }
-
-    // 缓存失效方法
-    public void evictShareCache(String shareCode) {
-        redisTemplate.delete(SHARE_CACHE_PREFIX + shareCode);
     }
 
     private List<VirtualFileVO> getVirtualFile(List<ShareLinkItem> shareLinkItems) {

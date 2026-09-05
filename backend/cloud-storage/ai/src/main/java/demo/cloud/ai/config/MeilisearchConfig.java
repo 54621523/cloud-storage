@@ -1,6 +1,7 @@
 package demo.cloud.ai.config;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.fasterxml.jackson.datatype.jsr310.JavaTimeModule;
 import com.meilisearch.sdk.Client;
 import com.meilisearch.sdk.Config;
 import demo.cloud.ai.vector.MeilisearchVectorStore;
@@ -30,6 +31,15 @@ public class MeilisearchConfig {
                 .indexName("document_index")
                 .meilisearchClient(meilisearchClient)
                 .objectMapper(new ObjectMapper())
+                .build();
+    }
+
+    @Bean
+    public VectorStore experienceStore(Client meilisearchClient){
+        return MeilisearchVectorStore.builder()
+                .indexName("experience_index")
+                .meilisearchClient(meilisearchClient)
+                .objectMapper(new ObjectMapper().registerModule(new JavaTimeModule()))
                 .build();
     }
 }

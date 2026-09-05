@@ -140,34 +140,18 @@ const handleFileChange = async (event: Event) => {
   }
 
   const fileList = Array.from(files)
-  const total = fileList.length
-  pendingAdd = true;
+  pendingAdd = true
 
-
-  totalFilesCount.value = total
-  completedFilesCount.value = 0
-  fileStatuses.value = []
-  isUploading.value = true
-  showProgressPanel.value = true
-
-  // 分批处理
+  // 只做 MD5 计算和添加，不修改任何统计变量
   for (let i = 0; i < fileList.length; i += BATCH_SIZE) {
     const batch = fileList.slice(i, i + BATCH_SIZE)
-
-    // 并行计算本批文件的 MD5
-    await Promise.all(
-      batch.map(async (file) => {
-        const md5 = await calculateFileMD5(file)
-        hashCache.set(file, md5)
-      })
-    )
-
-    // 添加本批文件到上传器
+    await Promise.all(batch.map(async (file) => {
+      const md5 = await calculateFileMD5(file)
+      hashCache.set(file, md5)
+    }))
     uploader.addFiles(batch)
-
   }
 
-  // 重置 input 以便重复选择
   target.value = ''
 }
 
@@ -360,32 +344,26 @@ onMounted(() => {
   }
 
   uploader.onUpdate = async (files: UploadFile[]) => {
-    // 如果正处于添加新文件的准备阶段，则初始化或更新计数
-    if (pendingAdd) {
-      // 仅当没有正在上传且面板未打开时，才重置所有状态（全新上传）
-      if (!isUploading.value && !showProgressPanel.value) {
-        // 全新上传，重置所有计数
-        totalFilesCount.value = files.length;
-        completedFilesCount.value = 0;
-        fileStatuses.value = [];
-        totalProgress.value = 0;
-        showProgressPanel.value = true;
-        isUploading.value = true;
-      } else {
-        // 上传中又添加了文件，只更新总文件数
-        totalFilesCount.value = files.length;
-        // 已完成数不变，面板已打开
-      }
-      pendingAdd = false; // 消费标记
-    } else {
-      // 非添加引起的 update（比如文件状态变化），只更新总文件数（防止漏计）
-      totalFilesCount.value = files.length;
-    }
+    // 总文件数 = 上传器里的全部文件
+    totalFilesCount.value = files.length
+    // 已完成数 = 状态为 'success' 的文件数
+    completedFilesCount.value = files.filter(f => f.status === 'success').length
+    // 更新文件状态列表（保留最近N条）
+    fileStatuses.value = files
+      .map(f => ({
+        name: f.fileName,
+        status: f.status === 'success' ? 'success' : f.status === 'error' ? 'error' : 'uploading',
+        percent: f.percent || 0
+      }))
+      .slice(-20) // 只保留最新20条，避免渲染过多
 
-    // 如果文件列表为空，关闭面板（可选）
+    // 控制面板显示
     if (files.length === 0) {
-      showProgressPanel.value = false;
-      isUploading.value = false;
+      showProgressPanel.value = false
+      isUploading.value = false
+    } else {
+      showProgressPanel.value = true
+      isUploading.value = files.some(f => f.status === 'UDLoading' || f.status === 'pending')
     }
   }
 

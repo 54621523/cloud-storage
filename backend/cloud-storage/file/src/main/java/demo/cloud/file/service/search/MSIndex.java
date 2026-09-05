@@ -1,10 +1,8 @@
 package demo.cloud.file.service.search;
 
-import java.lang.annotation.*; /**
- * MeiliSearch
- * 2023年9月21日
- */
-@Documented
+import java.lang.annotation.*;
+
+
 @Target(ElementType.TYPE)
 @Retention(RetentionPolicy.RUNTIME)
 public @interface MSIndex {

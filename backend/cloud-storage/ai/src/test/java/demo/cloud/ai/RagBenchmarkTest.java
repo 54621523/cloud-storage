@@ -2,6 +2,7 @@ package demo.cloud.ai;
 
 import com.alibaba.cloud.ai.graph.OverAllState;
 import com.alibaba.cloud.ai.graph.exception.GraphRunnerException;
+import com.alibaba.cloud.ai.graph.exception.GraphStateException;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
@@ -75,7 +76,7 @@ public class RagBenchmarkTest {
 
     // ===== 测试2：答案正确性 =====
     @Test
-    void testEndToEndPerformance() throws GraphRunnerException, JsonProcessingException {
+    void testEndToEndPerformance() throws GraphRunnerException, JsonProcessingException, GraphStateException {
         List<TestData.TestQuery> queries = TestData.createTestQueries();
 
         for (var q : queries) {

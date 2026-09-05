@@ -66,10 +66,9 @@
             </div>
           </div>
 
-          <!-- 右侧：独立于 bar 的按钮区域 -->
           <div class="action-btn-group">
-            <el-button type="primary" class="btn-save">保存到网盘</el-button>
-            <el-button class="btn-download">下载</el-button>
+            <el-button type="primary" class="btn-save" @click="handleBatchSave">保存到网盘</el-button>
+            <!-- <el-button class="btn-download" @click="handleBatchDownload">下载</el-button> -->
           </div>
         </div>
 
@@ -103,13 +102,12 @@ const {
   navigateTo,
   goToBreadcrumb,
   selectedCount,
+  selectedList,
   clearSelection,
   updateSelect,
-
   downloadFile,
   saveToMyDisk
 } = shareContext;
-
 // ---------- 保存目标相关 ----------
 const rootId = Number(localStorage.getItem('file_root_id'));
 const rootName = localStorage.getItem('file_root_name') || '我的文件';
@@ -135,6 +133,7 @@ const handlePathClick = (index: number) => {
   goToBreadcrumb(index);
 };
 
+
 const tableRowClassName = ({ row }: { row: FileItemUI }) => {
   return row.type === FileItemType.FOLDER ? 'folder-row' : '';
 };
@@ -154,6 +153,14 @@ const handleTransfer = (row: any) => {
   saveToMyDisk(row, targetId.value)
 };
 
+const handleBatchSave = () => {
+  if (selectedList.value.length === 0) return;
+  try {
+    saveToMyDisk(selectedList.value, targetId.value);
+  } catch (err: any) {
+    ElMessage.error('转存失败：' + (err.message || '未知错误'));
+  }
+}
 
 
 const dialogVisible = ref(false);

@@ -5,6 +5,7 @@ import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.github.yulichang.toolkit.JoinWrappers;
 import com.github.yulichang.wrapper.MPJLambdaWrapper;
 import demo.cloud.auth.dubboService.UserQuotaDubboService;
+import demo.cloud.file.cache.CacheInvalidationHelper;
 import demo.cloud.file.dto.FilePhysicalDTO;
 import demo.cloud.file.dto.ItemGroup;
 import demo.cloud.file.dto.ItemIdentity;
@@ -45,6 +46,7 @@ public class FileDubboServiceImpl implements FileDubboService {
     private final UserFolderService userFolderService;
     private final FilePhysicalService filePhysicalService;
     private final UserQuotaDubboService quotaDubboService;
+    private final CacheInvalidationHelper cache;
 
     private final S3Presigner s3Presigner;
 
@@ -272,7 +274,7 @@ public class FileDubboServiceImpl implements FileDubboService {
 
         if (totalFileSize > 0) {
             // 远程调用配额服务（Dubbo + Seata 全局事务）
-            boolean deducted = quotaDubboService.subtractUsedQuota(userId, totalFileSize);
+            boolean deducted = quotaDubboService.addUsedQuota(userId, totalFileSize);
             if (!deducted) {
                 throw new IllegalStateException("用户可用配额不足，无法完成复制操作");
             }
@@ -318,7 +320,10 @@ public class FileDubboServiceImpl implements FileDubboService {
         if (!newFiles.isEmpty()) {
             userFileService.saveBatch(newFiles, 1000);
         }
-        //TODO 缓存失效
+        Set<Long> affectedParentIds = new HashSet<>(oldToNew.values());
+        affectedParentIds.add(targetFolderId);
+        cache.evictDirectoryCacheBatch(affectedParentIds, userId);
+
     }
 
 

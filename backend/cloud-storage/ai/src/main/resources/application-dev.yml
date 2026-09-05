@@ -15,7 +15,8 @@ spring:
           model: deepseek-v4-flash-0731
       embedding:
         options:
-          model: text-embedding-v3
+          model: qwen3.7-text-embedding
+  #          model: text-embedding-v3
 
   cloud:
     nacos:
@@ -24,9 +25,11 @@ spring:
         server-addr: localhost:8848
         namespace: public
         group: DEFAULT_GROUP
-      config:
-        import-check:
-          enabled: false
+
+
+  config:
+    import:
+      - optional:nacos:common-rabbitmq.yaml
 
 
   rabbitmq:
