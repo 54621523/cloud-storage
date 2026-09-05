@@ -1,6 +1,5 @@
 package demo.cloud.ai.service;
 
-import com.alibaba.cloud.ai.dashscope.chat.DashScopeChatModel;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.meilisearch.sdk.Client;
@@ -11,7 +10,6 @@ import com.meilisearch.sdk.model.Searchable;
 import demo.cloud.ai.pojo.Experience;
 import lombok.Builder;
 import lombok.Data;
-import org.springframework.ai.chat.model.ChatModel;
 import org.springframework.ai.vectorstore.SearchRequest;
 
 import java.util.List;
@@ -41,7 +39,7 @@ public class ExperienceStore {
         Embedder embedder = new Embedder();
         embedder.setSource(EmbedderSource.REST);
         embedder.setUrl("https://dashscope.aliyuncs.com/compatible-mode/v1/embeddings");
-        embedder.setApiKey();
+        embedder.setApiKey("key");
 
 
     }
