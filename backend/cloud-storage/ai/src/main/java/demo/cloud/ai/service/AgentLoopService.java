@@ -10,7 +10,6 @@ import com.alibaba.cloud.ai.graph.exception.GraphRunnerException;
 import com.alibaba.cloud.ai.graph.exception.GraphStateException;
 import demo.cloud.ai.nodes.IntentCheckNode;
 import demo.cloud.ai.nodes.PreprocessNode;
-import demo.cloud.ai.tools.ExperienceTool;
 import demo.cloud.ai.tools.SearchTool;
 import lombok.extern.slf4j.Slf4j;
 import org.redisson.api.RedissonClient;
@@ -21,9 +20,7 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.context.annotation.Lazy;
 import org.springframework.stereotype.Service;
-import org.springframework.util.ReflectionUtils;
 
-import java.lang.reflect.Method;
 import java.time.Duration;
 import java.util.List;
 import java.util.Map;
@@ -69,15 +66,6 @@ public class AgentLoopService {
                 .inputType(SearchTool.LLMSearchRequest.class)
                 .build();
 
-        Method method = ReflectionUtils.findMethod(ExperienceTool.class, "readExperience");
-//        ToolCallback toolCallbackt = MethodToolCallback.builder()
-//                .toolDefinition(ToolDefinitions.builder(method)
-//                        .description("当你认为当前任务与经验相关时，使用这个工具获取经验完整信息")
-//                        .build())
-//                .toolMethod(method)
-//                .toolObject(new ExperienceTool())
-//                .build();
-
         RunnableConfig config = RunnableConfig.builder()
                 .threadId(sessionId)
                 .addMetadata("allowed_doc_ids",docIds)
@@ -87,11 +75,11 @@ public class AgentLoopService {
 
 
 
-        // 构建 ReactAgent，instruction 中使用占位符
         ReactAgent simpleRAGAgent = ReactAgent.builder()
                 .name("rag_agent")
                 .model(chatModel)
                 .saver(redisSaver)
+                .tools(toolCallback)
                 .outputKey("answer")
                 .hooks(ModelCallLimitHook.builder().runLimit(6).build())
                 .instruction("""

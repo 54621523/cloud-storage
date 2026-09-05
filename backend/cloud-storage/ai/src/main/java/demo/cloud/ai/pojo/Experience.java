@@ -13,7 +13,7 @@ import java.time.LocalDateTime;
 @AllArgsConstructor
 @Builder
 @MSIndex(uid = "experience_index", primaryKey = "id")
-public class Experience {
+public class Experience  {
 
     String id;
 
