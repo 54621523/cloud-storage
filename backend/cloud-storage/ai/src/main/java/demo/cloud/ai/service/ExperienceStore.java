@@ -4,44 +4,66 @@ import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.meilisearch.sdk.Client;
 import com.meilisearch.sdk.Index;
-import com.meilisearch.sdk.model.Embedder;
-import com.meilisearch.sdk.model.EmbedderSource;
+import com.meilisearch.sdk.exceptions.MeilisearchApiException;
 import com.meilisearch.sdk.model.Searchable;
+import demo.cloud.ai.anno.MeiliIndexConfig;
+import demo.cloud.ai.anno.MeiliSearchConfigHelper;
 import demo.cloud.ai.pojo.Experience;
-import lombok.Builder;
+import jakarta.annotation.PostConstruct;
 import lombok.Data;
-import org.springframework.ai.vectorstore.SearchRequest;
+import org.springframework.stereotype.Component;
 
 import java.util.List;
 import java.util.stream.Collectors;
 
 @Data
-@Builder
+@Component
 public class ExperienceStore {
 
     private final Client meilisearchClient;
-    private final String indexName;
+    private String indexName;
     private final ObjectMapper objectMapper;
+    private String primaryKey;
 
 
-    public ExperienceStore(Client meilisearchClient, String indexName, ObjectMapper objectMapper) {
+    public ExperienceStore(Client meilisearchClient, ObjectMapper objectMapper) {
+        MeiliIndexConfig config = MeiliSearchConfigHelper.extractConfig(Experience.class);
         this.meilisearchClient = meilisearchClient;
-        this.indexName = indexName;
+        this.indexName = config.getUid();
+        this.primaryKey = config.getPrimaryKey();
         this.objectMapper = objectMapper;
     }
 
-    public void Init(){
-        Index index = meilisearchClient.getIndex(indexName);
-        if(index == null){
-            meilisearchClient.createIndex(indexName, "id");
-            index = meilisearchClient.getIndex(indexName);
+    @PostConstruct
+    public void Init() {
+        try {
+            MeiliIndexConfig config = MeiliSearchConfigHelper.extractConfig(Experience.class);
+            meilisearchClient.createIndex(config.getUid(), config.getPrimaryKey());
+            // 尝试获取索引，若存在则直接使用
+            Index index = meilisearchClient.getIndex(indexName);
+            // 索引存在，更新设置（可选）
+            updateIndexSettings(index);
+        } catch (MeilisearchApiException e) {
+            // 如果是索引不存在 (HTTP 404)
+            if (e.getCode().equals("404")) {
+                meilisearchClient.createIndex(indexName, "id");
+                // 创建后获取索引
+                Index index = meilisearchClient.getIndex(indexName);
+                // 更新设置
+                updateIndexSettings(index);
+            } else {
+                // 其他异常直接抛出
+                throw new RuntimeException("Failed to initialize Meilisearch index", e);
+            }
+        } catch (Exception e) {
+            throw new RuntimeException("Failed to initialize Meilisearch index", e);
         }
-        Embedder embedder = new Embedder();
-        embedder.setSource(EmbedderSource.REST);
-        embedder.setUrl("https://dashscope.aliyuncs.com/compatible-mode/v1/embeddings");
-        embedder.setApiKey("key");
+    }
 
-
+    private void updateIndexSettings(Index index) {
+        MeiliIndexConfig config = MeiliSearchConfigHelper.extractConfig(Experience.class);
+        index.updateFilterableAttributesSettings(config.getFilterableAttributes());
+        index.updateSearchableAttributesSettings(config.getSearchableAttributes());
     }
 
 
@@ -50,11 +72,10 @@ public class ExperienceStore {
 
     public void add(List<Experience> experiences) {
 
-        // 3. 批量索引到 Meilisearch（支持异步或同步）
         Index index = meilisearchClient.index(indexName);
         try {
             String s = objectMapper.writeValueAsString(experiences);
-            index.addDocuments(s); // 同步，可改为异步
+            index.addDocuments(s);
         }
         catch (JsonProcessingException e) {
             throw new RuntimeException(e);
@@ -63,11 +84,10 @@ public class ExperienceStore {
 
 
 
-    public List<Experience> search(SearchRequest request) {
+    public Experience search(String name) {
         com.meilisearch.sdk.SearchRequest searchRequest = com.meilisearch.sdk.SearchRequest.builder()
-                .q(request.getQuery())
-                .rankingScoreThreshold(request.getSimilarityThreshold())
-                .limit(request.getTopK())
+                .filter(new String[]{name})
+                .limit(1)
                 .build();
 
         // 3. 执行搜索
@@ -83,8 +103,7 @@ public class ExperienceStore {
                     exp.setDescription((String) hit.get("description"));
                     exp.setContent((String) hit.get("content"));
                     return exp;
-                })
-                .collect(Collectors.toList());
+                }).toList().get(0);
     }
 
     public List<Experience> listAllSummaries() {
@@ -92,7 +111,7 @@ public class ExperienceStore {
         com.meilisearch.sdk.SearchRequest searchRequest = com.meilisearch.sdk.SearchRequest.builder()
                 .q("") // 空查询返回所有文档
                 .attributesToRetrieve(new String[]{"id", "name", "description", "type"})
-                .limit(1000) // 根据实际情况调整
+                .limit(1000)
                 .build();
         Index index = meilisearchClient.index(indexName);
         Searchable result = index.search(searchRequest);
@@ -101,6 +120,7 @@ public class ExperienceStore {
                         .id((String) hit.get("id"))
                         .name((String) hit.get("name"))
                         .description((String) hit.get("description"))
+                        .content((String) hit.get("content"))
                         .build())
                 .collect(Collectors.toList());
     }

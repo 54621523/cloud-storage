@@ -10,6 +10,7 @@ import com.alibaba.cloud.ai.graph.exception.GraphRunnerException;
 import com.alibaba.cloud.ai.graph.exception.GraphStateException;
 import demo.cloud.ai.nodes.IntentCheckNode;
 import demo.cloud.ai.nodes.PreprocessNode;
+import demo.cloud.ai.tools.ExperienceTool;
 import demo.cloud.ai.tools.SearchTool;
 import lombok.extern.slf4j.Slf4j;
 import org.redisson.api.RedissonClient;
@@ -18,8 +19,11 @@ import org.springframework.ai.tool.ToolCallback;
 import org.springframework.ai.tool.function.FunctionToolCallback;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Qualifier;
+import org.springframework.context.annotation.Lazy;
 import org.springframework.stereotype.Service;
+import org.springframework.util.ReflectionUtils;
 
+import java.lang.reflect.Method;
 import java.time.Duration;
 import java.util.List;
 import java.util.Map;
@@ -33,6 +37,12 @@ import static com.alibaba.cloud.ai.graph.action.AsyncNodeAction.node_async;
 public class AgentLoopService {
     private static final int MAX_TURNS = 5;
     private static final Duration TOTAL_TIMEOUT = Duration.ofSeconds(30);
+
+    @Lazy
+    @Autowired
+    private AgentLoopService self;
+
+
 
     @Qualifier("dashScopeChatModel")
     @Autowired
@@ -52,19 +62,27 @@ public class AgentLoopService {
     private PreprocessNode preprocessNode;
 
 
-    public Optional<OverAllState> runAgent(String sessionId, String query, List<String> docIds, Float ratio) throws GraphRunnerException, GraphStateException {
+    public Optional<OverAllState> runAgent(String sessionId, String query, List<Long> docIds) throws GraphRunnerException, GraphStateException {
         ToolCallback toolCallback = FunctionToolCallback
                 .builder("document_search", searchTool)
                 .description("Get information from database")
                 .inputType(SearchTool.LLMSearchRequest.class)
                 .build();
 
+        Method method = ReflectionUtils.findMethod(ExperienceTool.class, "readExperience");
+//        ToolCallback toolCallbackt = MethodToolCallback.builder()
+//                .toolDefinition(ToolDefinitions.builder(method)
+//                        .description("当你认为当前任务与经验相关时，使用这个工具获取经验完整信息")
+//                        .build())
+//                .toolMethod(method)
+//                .toolObject(new ExperienceTool())
+//                .build();
+
         RunnableConfig config = RunnableConfig.builder()
                 .threadId(sessionId)
-                .addMetadata("allowed_doc_ids",List.of(0L,1L,2L,3L,4L,5L,6L,7L,8L,9L,10L,11L,12L,13L,14L))
+                .addMetadata("allowed_doc_ids",docIds)
                 .build();
 
-        //
         RedisSaver redisSaver = RedisSaver.builder().redisson(redissonClient).build();
 
 
@@ -83,6 +101,9 @@ public class AgentLoopService {
 2. 基于检索到的信息生成准确、完整的答案
 3. 如果信息不足，可以多次调用工具
 4. 如果你有足够信心回答时，直接输出最终答案，不用再调用工具
+
+当前可用的经验列表（名称 - 描述）：
+{experience}
 
 当前用户背景信息：
 {user_context}

@@ -2,12 +2,12 @@ package demo.cloud.ai.nodes;
 
 import com.alibaba.cloud.ai.graph.OverAllState;
 import com.alibaba.cloud.ai.graph.action.NodeAction;
-import com.fasterxml.jackson.databind.ObjectMapper;
+import demo.cloud.ai.pojo.Experience;
 import demo.cloud.ai.pojo.UserContext;
+import demo.cloud.ai.service.ExperienceStore;
 import demo.cloud.ai.service.UserContextService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
-import org.redisson.api.RedissonClient;
 import org.springframework.ai.chat.messages.Message;
 import org.springframework.ai.chat.messages.MessageType;
 import org.springframework.ai.chat.model.ChatModel;
@@ -16,6 +16,7 @@ import org.springframework.stereotype.Component;
 import java.time.Duration;
 import java.util.*;
 import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.TimeUnit;
 
 @Component
@@ -25,9 +26,10 @@ public class PreprocessNode implements NodeAction {
 
 
     private final ChatModel chatModel;
-    private final RedissonClient redissonClient;
     private final UserContextService userContextService;
-    private final ObjectMapper objectMapper;
+    private final ExperienceStore experienceStore;
+
+    public volatile Map<String, Experience> experienceCache = new ConcurrentHashMap<>();
 
 
     private static final int HISTORY_WINDOW = 5;
@@ -50,22 +52,49 @@ public class PreprocessNode implements NodeAction {
                         loadUserContext(threadId)
                 ).orTimeout(USER_CONTEXT_TIMEOUT.toMillis(), TimeUnit.MILLISECONDS)
                 .exceptionally(th -> {
-                    log.warn("User context load failed, using empty", th);
+                    log.warn("没有该用户上下文", th);
                     return UserContext.empty();
                 });
 
-        // 等待两个任务完成（最长等待3秒，整体超时由外部控制）
-        CompletableFuture.allOf(resolvedQueryFuture, userContextFuture).join();
+        CompletableFuture<List<Experience>> experienceSummariesFuture = CompletableFuture.supplyAsync(() ->
+                experienceStore.listAllSummaries()   // 只返回 id, name, description, type
+        ).exceptionally(th -> {
+            log.warn("Failed to load experience summaries", th);
+            return Collections.emptyList();
+        });
+
+        // 等待任务完成
+        CompletableFuture.allOf(resolvedQueryFuture, userContextFuture, experienceSummariesFuture).join();
 
         String resolvedQuery = resolvedQueryFuture.join();
         UserContext userContext = userContextFuture.join();
+        List<Experience> summaries = experienceSummariesFuture.join();
+        StringBuilder prompt = new StringBuilder();
+        if (!summaries.isEmpty()) {
+            // 注意：此时只缓存摘要，content 为空，后续通过工具按需加载
+            Map<String, Experience> newCache = new ConcurrentHashMap<>();
+            for (Experience exp : summaries) {
+                newCache.put(exp.getName(), exp);   // 以 name 为 key
+            }
+            this.experienceCache = newCache;        // volatile 赋值
 
+            for (Experience exp : summaries) {
+                prompt.append("- ").append(exp.getName())
+                        .append(": ").append(exp.getDescription())
+                        .append(")\n");
+            }
+            prompt.append("\n");
+        }
+
+        if (prompt.isEmpty()){
+            prompt.append("该用户无相关可查询经验");
+        }
         // 2. 构造增强上下文
         Map<String, Object> updates = new HashMap<>();
         updates.put("resolved_query", resolvedQuery);
         updates.put("user_context", userContext);
+        updates.put("experience", prompt);
 
-        // 可选：将增强信息也存到metadata，便于调试
         updates.put("preprocess_metadata", Map.of(
                 "history_used", HISTORY_WINDOW,
                 "context_loaded", userContext.isNotEmpty()
@@ -135,4 +164,7 @@ public class PreprocessNode implements NodeAction {
         // 预留接口
         return userContextService.getUserContext(sessionId);
     }
+
+
+
 }

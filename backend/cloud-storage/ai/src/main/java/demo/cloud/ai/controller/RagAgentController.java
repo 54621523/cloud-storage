@@ -38,7 +38,7 @@ public class RagAgentController {
     @GetMapping("/test")
     @ResponseBody
     public String chatTest(String query) throws GraphRunnerException, GraphStateException {
-        Optional<OverAllState> overAllState = service.runAgent("1", query, null, null);
+        Optional<OverAllState> overAllState = service.runAgent("1", query, List.of(0L,1L,2L,3L,4L,5L,6L,7L,8L,9L,10L,11L,12L,13L,14L));
         if(overAllState.isPresent()){
             log.info(overAllState.toString());
             OverAllState state = overAllState.get();
